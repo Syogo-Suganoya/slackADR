@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.DS_Store
+
+README.md
+DEPLOYMENT.md
+DISTRIBUTION.md
+MULTI_TENANT_CONFIG.md
+NOTION_PUBLIC_AUTH.md
+SLACK_APP_SETUP.md
+demo/*
+.github/workflows/notion-recovery.yml
