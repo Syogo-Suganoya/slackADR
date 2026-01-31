@@ -22,6 +22,12 @@ const app = new App({
 // Register Handlers
 registerSlackHandlers(app);
 
+// Debug: Log all incoming requests
+receiver.app.use((req, res, next) => {
+  console.log(`[DEBUG] ${req.method} ${req.path}`);
+  next();
+});
+
 // Recovery Endpoint (Triggered by GitHub Actions)
 receiver.app.post('/recovery', async (req, res) => {
   const token = req.headers['x-recovery-token'];

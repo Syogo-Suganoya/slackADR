@@ -9,9 +9,9 @@ export class NotionService {
   private databaseId: string;
   private dataSourceId: string;
 
-  constructor() {
+  constructor(customDatabaseId?: string) {
     this.notion = new Client({ auth: process.env.NOTION_API_KEY });
-    this.databaseId = process.env.NOTION_DATABASE_ID || '';
+    this.databaseId = customDatabaseId || process.env.NOTION_DATABASE_ID || '';
     this.dataSourceId = process.env.NOTION_DATASOURCE_ID || '';
     
     if (!this.databaseId) {
@@ -30,8 +30,9 @@ export class NotionService {
     return text.replace(/\*\*|_/g, '');
   }
 
-  public async createADRPage(adr: ADRData, slackLink: string): Promise<string> {
-    if (!this.databaseId) {
+  public async createADRPage(adr: ADRData, slackLink: string, overrideDatabaseId?: string): Promise<string> {
+    const targetDatabaseId = overrideDatabaseId || this.databaseId;
+    if (!targetDatabaseId) {
         throw new Error('Notion Database ID is missing.');
     }
 
@@ -132,7 +133,7 @@ export class NotionService {
 
     try {
         const response = await this.notion.pages.create({
-            parent: { database_id: this.databaseId },
+            parent: { database_id: targetDatabaseId },
             properties: {
                 Name: {
                     title: [{ text: { content: adr.title } }],
@@ -154,8 +155,9 @@ export class NotionService {
     }
   }
 
-  public async createErrorLogPage(prompt: string, slackLink: string): Promise<string> {
-    if (!this.databaseId) {
+  public async createErrorLogPage(prompt: string, slackLink: string, overrideDatabaseId?: string): Promise<string> {
+    const targetDatabaseId = overrideDatabaseId || this.databaseId;
+    if (!targetDatabaseId) {
         throw new Error('Notion Database ID is missing.');
     }
 
@@ -196,7 +198,7 @@ export class NotionService {
 
     try {
         const response = await this.notion.pages.create({
-            parent: { database_id: this.databaseId },
+            parent: { database_id: targetDatabaseId },
             properties: {
                 Name: {
                     title: [

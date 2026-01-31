@@ -1,0 +1,23 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ChannelConfig {
+  id               Int      @id @default(autoincrement())
+  workspaceId     String   // Slack Team ID
+  channelId       String   @unique // Slack Channel ID
+  notionDatabaseId String
+  notionDataSourceId String? // Notion Data Source ID (自動取得)
+  geminiApiKey     String?
+  triggerEmoji     String   @default("decision")
+  updatedAt        DateTime @updatedAt
+
+  @@index([workspaceId])
+}

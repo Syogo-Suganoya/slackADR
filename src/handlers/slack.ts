@@ -1,15 +1,24 @@
 import { App } from '@slack/bolt';
+import { WebClient } from '@slack/web-api';
 import { AIService } from '../services/ai';
 import { NotionService } from '../services/notion';
-import { WebClient } from '@slack/web-api';
+import { ConfigService } from '../services/config';
 
 const aiService = new AIService();
 const notionService = new NotionService();
+const configService = new ConfigService();
 
 export const registerSlackHandlers = (app: App) => {
   app.event('reaction_added', async ({ event, client, logger }) => {
-    // 1. Check for specific emoji
-    if (event.reaction !== 'decision') {
+    logger.info(`Received reaction: ${event.reaction} from ${event.user} in ${event.item.channel}`);
+
+    // 1. Check config
+    const config = await configService.getChannelConfig(event.item.channel);
+    logger.info('Current channel config:', config);
+
+    const triggerEmoji = config?.triggerEmoji || 'decision';
+
+    if (event.reaction !== triggerEmoji) {
       return;
     }
 
@@ -61,10 +70,12 @@ export const registerSlackHandlers = (app: App) => {
       const slackLink = permalink.permalink || '';
 
       // 5. Generate ADR with AI
-      const adrData = await aiService.generateADR(threadText, slackLink);
-
+      const adrData = await aiService.generateADR(threadText, slackLink, {
+        geminiApiKey: config?.geminiApiKey || undefined,
+        notionDatabaseId: config?.notionDatabaseId
+      });
       // 6. Create Notion Page
-      const notionUrl = await notionService.createADRPage(adrData, slackLink);
+      const notionUrl = await notionService.createADRPage(adrData, slackLink, config?.notionDatabaseId);
 
       // 6. Post Summary to Slack
       await client.chat.postMessage({
@@ -88,19 +99,25 @@ export const registerSlackHandlers = (app: App) => {
   // Slash Command: /adr-config
   app.command('/adr-config', async ({ ack, body, client, logger }) => {
     await ack();
-    logger.info(`User ${body.user_id} triggered /adr-config`);
+    logger.info(`User ${body.user_id} triggered /adr-config in workspace ${body.team_id}`);
 
     try {
+      const config = await configService.getChannelConfig(body.channel_id);
+      
       await client.views.open({
         trigger_id: body.trigger_id,
         view: {
           type: 'modal',
           callback_id: 'config_modal_submit',
+          private_metadata: JSON.stringify({ 
+            channelId: body.channel_id,
+            workspaceId: body.team_id 
+          }), // Pass both IDs to the view
           title: { type: 'plain_text', text: 'ADR Bot 設定' },
           blocks: [
             {
               type: 'section',
-              text: { type: 'mrkdwn', text: 'ADR 生成のための基本設定を行います。' }
+              text: { type: 'mrkdwn', text: 'ADR 生成のための基本設定を行います。チャンネルごとに異なる Notion データベースを指定できます。' }
             },
             {
               type: 'input',
@@ -109,19 +126,21 @@ export const registerSlackHandlers = (app: App) => {
               element: {
                 type: 'plain_text_input',
                 action_id: 'notion_url_input',
+                initial_value: config?.notionDatabaseId ? `https://www.notion.so/${config.notionDatabaseId}` : '',
                 placeholder: { type: 'plain_text', text: 'https://www.notion.so/...' }
               }
             },
             {
               type: 'input',
               block_id: 'gemini_key_block',
-              label: { type: 'plain_text', text: 'Gemini API Key' },
+              label: { type: 'plain_text', text: 'Gemini API Key (Optional)' },
               element: {
                 type: 'plain_text_input',
                 action_id: 'gemini_key_input',
-                initial_value: process.env.GEMINI_API_KEY || '',
+                initial_value: config?.geminiApiKey || '',
                 placeholder: { type: 'plain_text', text: 'AI-...' }
-              }
+              },
+              optional: true
             },
             {
               type: 'input',
@@ -130,7 +149,7 @@ export const registerSlackHandlers = (app: App) => {
               element: {
                 type: 'plain_text_input',
                 action_id: 'emoji_input',
-                initial_value: 'decision',
+                initial_value: config?.triggerEmoji || 'decision',
                 placeholder: { type: 'plain_text', text: 'decision' }
               }
             }
@@ -146,14 +165,29 @@ export const registerSlackHandlers = (app: App) => {
   // Modal Submission: config_modal_submit
   app.view('config_modal_submit', async ({ ack, body, view, logger }) => {
     await ack();
+    logger.info('Modal submitted, parsing metadata...');
+    const { channelId, workspaceId } = JSON.parse(view.private_metadata);
+    logger.info(`Channel: ${channelId}, Workspace: ${workspaceId}`);
     const values = view.state.values;
     const notionUrl = values.notion_url_block.notion_url_input.value;
     const geminiKey = values.gemini_key_block.gemini_key_input.value;
     const emoji = values.emoji_block.emoji_input.value;
 
-    logger.info('Config submitted:', { notionUrl, geminiKey, emoji });
+    logger.info(`Submitted values - URL: ${notionUrl}, Emoji: ${emoji}`);
+    const notionDatabaseId = configService.extractDatabaseId(notionUrl || '');
+    logger.info(`Extracted Database ID: ${notionDatabaseId}`);
 
-    // TODO: 将来的にはここで入力された値をワークスペースIDごとにDBへ保存する
-    // 目前はログ表示のみで動作確認とする
+    if (notionDatabaseId) {
+      await configService.saveChannelConfig({
+        workspaceId,
+        channelId,
+        notionDatabaseId,
+        geminiApiKey: geminiKey || undefined,
+        triggerEmoji: emoji || undefined
+      });
+      logger.info(`Config saved for channel ${channelId} in workspace ${workspaceId}:`, { notionDatabaseId, emoji });
+    } else {
+      logger.error('Invalid Notion URL submitted');
+    }
   });
 };

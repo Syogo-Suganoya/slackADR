@@ -3,9 +3,13 @@ services:
     name: slack-adr-bot
     env: node
     plan: free
-    buildCommand: npm install && npm run build
-    startCommand: npm run start:recovery
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npm run start
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: slack-adr-db
+          property: connectionString
       - key: SLACK_BOT_TOKEN
         sync: false
       - key: SLACK_SIGNING_SECRET
@@ -16,3 +20,7 @@ services:
         sync: false
       - key: NOTION_DATABASE_ID
         sync: false
+
+databases:
+  - name: slack-adr-db
+    plan: free
