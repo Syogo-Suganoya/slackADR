@@ -35,6 +35,7 @@ ADR を保存するための Notion データベースを作成します。
 ### 2. チャンネルごとの設定
 ![alt text](image/readme/adr_command.jpg)
 ![alt text](image/readme/model.jpg)
+
 チャンネルで `/adr-config` を実行し、モーダルに以下を入力：
 - **Notion Database URL**: ADR を保存する Notion データベースの URL
 - **Gemini API Key** (オプション): チャンネル専用の API キーを使う場合
