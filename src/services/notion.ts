@@ -22,7 +22,10 @@ export class NotionService {
     }
   }
 
-  private cleanText(text: string): string {
+  private cleanText(text: any): string {
+    if (typeof text !== 'string') {
+      return String(text || '');
+    }
     // Remove Markdown bold/italic markers
     return text.replace(/\*\*|_/g, '');
   }
