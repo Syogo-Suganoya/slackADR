@@ -13,6 +13,40 @@ AI (Gemini) を使用して議論を要約し、データベース化します�
 
 ## 📖 使い方
 
+```mermaid
+graph TD
+    %% 初期設定フェーズ
+    subgraph Setup ["<font color='#01579B'>0. 初期設定 (初回のみ)</font>"]
+        A[Notion DB作成 & プロパティ設定] --> B[Notionコネクト追加]
+        B --> C[Slackアプリをチャンネルに招待]
+        C --> D["/adr-config でDB接続設定"]
+    end
+
+    %% 通常運用フェーズ
+    subgraph Usage ["<font color='#2E7D32'>1. 通常のADR作成フロー</font>"]
+        E[Slackスレッドで議論] --> F["親メッセージに :decision: リアクション"]
+        F --> G{AI解析成功?}
+        G -- Yes --> H[NotionにADRを自動生成]
+        H --> I[Slackに完了通知]
+    end
+
+    %% リカバリーフェーズ
+    subgraph Recovery ["<font color='#F57F17'>2. エラー時のリカバリー</font>"]
+        G -- No --> J[Notionにエラーログを作成]
+        J --> K[Slackにエラー通知]
+        K --> L[外部AIにプロンプトを手動入力]
+        L --> M[JSONレスポンスをNotionに貼り付け]
+        M --> N["Tagsを 'Ready' に変更"]
+        N --> O[5分おきのバッチ処理が自動検知]
+        O --> H
+    end
+
+    %% スタイル定義
+    style Setup fill:#E1F5FE,stroke:#01579B,stroke-width:2px
+    style Usage fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px
+    style Recovery fill:#FFFDE7,stroke:#FBC02D,stroke-width:2px
+```
+
 ### 0. Notion データベースの準備
 ![alt text](image/readme/emp.jpg)
 
