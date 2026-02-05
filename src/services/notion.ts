@@ -294,4 +294,30 @@ export class NotionService {
         console.error(`Failed to handle ready page ${page.id}:`, error);
     }
   }
+
+  public async listDatabases(token: string): Promise<{ id: string, title: string }[]> {
+    const notion = new Client({ auth: token });
+    try {
+      const response = await notion.search({
+        filter: {
+          value: 'database',
+          property: 'object'
+        } as any,
+        page_size: 100
+      });
+
+      return (response.results as any[]).map(db => {
+        // Extract title from database properties
+        const titleItems = db.title || [];
+        const title = titleItems.length > 0 ? titleItems[0].plain_text : 'Untitled Database';
+        return {
+          id: db.id,
+          title: title
+        };
+      });
+    } catch (error) {
+      console.error('Failed to list Notion databases:', error);
+      return [];
+    }
+  }
 }

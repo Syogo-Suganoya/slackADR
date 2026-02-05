@@ -117,7 +117,18 @@ export const registerSlackHandlers = (app: App) => {
     try {
       const config = await configService.getChannelConfig(body.channel_id);
       const workspaceConfig = await configService.getWorkspaceConfig(body.team_id);
-      const workspaceId = workspaceConfig?.notionAccessToken ? body.team_id : null;
+      const token = workspaceConfig?.notionAccessToken;
+      const workspaceId = token ? body.team_id : null;
+
+      let databaseOptions: any[] = [];
+      if (token) {
+        const databases = await notionService.listDatabases(token);
+        databaseOptions = databases.map(db => ({
+          text: { type: 'plain_text', text: db.title },
+          value: db.id
+        }));
+      }
+
       await client.views.open({
         trigger_id: body.trigger_id,
         view: {
@@ -126,7 +137,7 @@ export const registerSlackHandlers = (app: App) => {
           private_metadata: JSON.stringify({ 
             channelId: body.channel_id,
             workspaceId: body.team_id 
-          }), // Pass both IDs to the view
+          }), 
           title: { type: 'plain_text', text: 'ADR Bot 設定' },
           blocks: [
             {
@@ -158,13 +169,19 @@ export const registerSlackHandlers = (app: App) => {
             },
             {
               type: 'input',
-              block_id: 'notion_url_block',
-              label: { type: 'plain_text', text: 'Notion Database URL' },
-              element: {
+              block_id: 'notion_db_block',
+              label: { type: 'plain_text', text: 'Notion Database' },
+              element: workspaceId && databaseOptions.length > 0 ? {
+                type: 'static_select',
+                action_id: 'notion_db_select',
+                placeholder: { type: 'plain_text', text: 'データベースを選択...' },
+                options: databaseOptions,
+                initial_option: databaseOptions.find(opt => opt.value === config?.notionDatabaseId)
+              } : {
                 type: 'plain_text_input',
                 action_id: 'notion_url_input',
                 initial_value: config?.notionDatabaseId ? `https://www.notion.so/${config.notionDatabaseId}` : '',
-                placeholder: { type: 'plain_text', text: 'https://www.notion.so/...' }
+                placeholder: { type: 'plain_text', text: '先に Notion と連携してください、またはURLを入力' }
               }
             },
             {
@@ -206,12 +223,21 @@ export const registerSlackHandlers = (app: App) => {
     const { channelId, workspaceId } = JSON.parse(view.private_metadata);
     logger.info(`Channel: ${channelId}, Workspace: ${workspaceId}`);
     const values = view.state.values;
-    const notionUrl = values.notion_url_block.notion_url_input.value;
+    
+    // Support both dropdown and legacy URL input
+    let notionDatabaseId: string | null = null;
+    
+    if (values.notion_db_block?.notion_db_select) {
+      // From dropdown
+      notionDatabaseId = values.notion_db_block.notion_db_select.selected_option?.value || null;
+    } else if (values.notion_db_block?.notion_url_input) {
+      // From legacy URL input
+      const notionUrl = values.notion_db_block.notion_url_input.value;
+      notionDatabaseId = configService.extractDatabaseId(notionUrl || '');
+    }
+
     const geminiKey = values.gemini_key_block.gemini_key_input.value;
     const emoji = values.emoji_block.emoji_input.value;
-
-    logger.info(`Submitted values - URL: ${notionUrl}, Emoji: ${emoji}`);
-    const notionDatabaseId = configService.extractDatabaseId(notionUrl || '');
     logger.info(`Extracted Database ID: ${notionDatabaseId}`);
 
     if (notionDatabaseId) {
