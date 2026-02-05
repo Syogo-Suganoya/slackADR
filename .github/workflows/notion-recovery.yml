@@ -10,6 +10,17 @@ jobs:
   recover:
     runs-on: ubuntu-latest
     steps:
+      - name: Check Secrets
+        run: |
+          if [ -z "${{ secrets.APP_URL }}" ]; then
+            echo "Error: APP_URL secret is not set."
+            exit 1
+          fi
+          if [ -z "${{ secrets.RECOVERY_TOKEN }}" ]; then
+            echo "Error: RECOVERY_TOKEN secret is not set."
+            exit 1
+          fi
+
       - name: Trigger Recovery on Render
         run: |
           curl -X POST "${{ secrets.APP_URL }}/recovery" \
