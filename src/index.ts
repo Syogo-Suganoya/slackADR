@@ -4,19 +4,26 @@ import { registerSlackHandlers } from './handlers/slack';
 import { NotionService } from './services/notion';
 import { handleNotionAuthStart, handleNotionCallback } from './routes/notion-auth';
 
+import { SlackInstallationStore } from './services/slack-installation';
+
 dotenv.config();
 
 const notionService = new NotionService();
+const installationStore = new SlackInstallationStore();
 
 // Initialize the ExpressReceiver
 const receiver = new ExpressReceiver({
   signingSecret: process.env.SLACK_SIGNING_SECRET || '',
-  processBeforeResponse: true, // Required for some environments
+  clientId: process.env.SLACK_CLIENT_ID,
+  clientSecret: process.env.SLACK_CLIENT_SECRET,
+  stateSecret: process.env.SLACK_STATE_SECRET,
+  scopes: ['channels:history', 'groups:history', 'chat:write', 'commands', 'reactions:read'],
+  installationStore,
+  processBeforeResponse: true,
 });
 
 // Initialize the App
 const app = new App({
-  token: process.env.SLACK_BOT_TOKEN,
   receiver,
 });
 

@@ -10,15 +10,21 @@ services:
         fromDatabase:
           name: slack-adr-db
           property: connectionString
-      - key: SLACK_BOT_TOKEN
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
         sync: false
       - key: SLACK_SIGNING_SECRET
+        sync: false
+      - key: SLACK_STATE_SECRET
         sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: NOTION_API_KEY
         sync: false
       - key: NOTION_DATABASE_ID
+        sync: false
+      - key: NOTION_DATASOURCE_ID
         sync: false
       - key: NOTION_CLIENT_ID
         sync: false

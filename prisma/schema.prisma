@@ -29,3 +29,25 @@ model WorkspaceConfig {
   notionOwner        Json?
   updatedAt          DateTime @updatedAt
 }
+
+model SlackInstallation {
+  id                Int      @id @default(autoincrement())
+  teamId            String?  @unique
+  enterpriseId      String?
+  userId            String?
+  botToken          String?
+  botId             String?
+  botUserId         String?
+  botScopes         String?
+  userToken         String?
+  userScopes        String?
+  incomingWebhookUrl String?
+  incomingWebhookChannelId String?
+  appId             String?
+  tokenType         String?
+  isEnterpriseInstall Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([teamId])
+}
