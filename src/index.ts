@@ -1,4 +1,3 @@
-```typescript
 import { App, ExpressReceiver } from '@slack/bolt';
 import dotenv from 'dotenv';
 import { registerSlackHandlers } from './handlers/slack';
