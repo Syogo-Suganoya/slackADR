@@ -11,13 +11,21 @@ datasource db {
 
 model ChannelConfig {
   id               Int      @id @default(autoincrement())
-  workspaceId     String   // Slack Team ID
-  channelId       String   @unique // Slack Channel ID
+  workspaceId     String   
+  channelId       String   @unique 
   notionDatabaseId String
-  notionDataSourceId String? // Notion Data Source ID (自動取得)
+  notionDataSourceId String? 
   geminiApiKey     String?
   triggerEmoji     String   @default("decision")
   updatedAt        DateTime @updatedAt
 
   @@index([workspaceId])
+}
+
+model WorkspaceConfig {
+  workspaceId        String   @id
+  notionAccessToken  String?
+  notionBotId        String?
+  notionOwner        Json?
+  updatedAt          DateTime @updatedAt
 }

@@ -9,8 +9,8 @@ export class NotionService {
   private databaseId: string;
   private dataSourceId: string;
 
-  constructor(customDatabaseId?: string) {
-    this.notion = new Client({ auth: process.env.NOTION_API_KEY });
+  constructor(token?: string, customDatabaseId?: string) {
+    this.notion = new Client({ auth: token || process.env.NOTION_API_KEY });
     this.databaseId = customDatabaseId || process.env.NOTION_DATABASE_ID || '';
     this.dataSourceId = process.env.NOTION_DATASOURCE_ID || '';
     
@@ -30,7 +30,61 @@ export class NotionService {
     return text.replace(/\*\*|_/g, '');
   }
 
-  public async createADRPage(adr: ADRData, slackLink: string, overrideDatabaseId?: string): Promise<string> {
+  private formatKey(key: string): string {
+    // Replace underscores with spaces and insert space before capital letters (for snake_case/camelCase)
+    const spaced = key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+    // Capitalize first letter and everything else to lowercase (except maybe acronyms, but simple for now)
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+  }
+
+  private buildBlocksRecursive(data: any, level: number = 2): any[] {
+    const blocks: any[] = [];
+    const maxLevel = 3; // Notion supports h1, h2, h3. Usage above h3 will fall back to paragraph or bulleted list.
+
+    if (Array.isArray(data)) {
+        data.forEach(item => {
+            if (typeof item === 'object' && item !== null) {
+                blocks.push(...this.buildBlocksRecursive(item, level));
+            } else {
+                blocks.push({
+                    bulleted_list_item: {
+                        rich_text: [{ text: { content: this.cleanText(item) } }]
+                    }
+                });
+            }
+        });
+    } else if (typeof data === 'object' && data !== null) {
+        Object.entries(data).forEach(([key, value]) => {
+            // Skip title and tags as they are handled as page properties
+            if (level === 2 && (key === 'title' || key === 'tags' || key === 'status' || key === 'manualPrompt')) return;
+
+            // Heading for the key
+            const headingType = `heading_${Math.min(level, maxLevel)}` as any;
+            blocks.push({
+                [headingType]: {
+                    rich_text: [{ text: { content: this.formatKey(key) } }]
+                }
+            });
+
+            // Content for the value
+            if (typeof value === 'object' && value !== null) {
+                blocks.push(...this.buildBlocksRecursive(value, level + 1));
+            } else {
+                blocks.push({
+                    paragraph: {
+                        rich_text: [{ text: { content: this.cleanText(value) } }]
+                    }
+                });
+            }
+        });
+    }
+    return blocks;
+  }
+
+  public async createADRPage(adr: ADRData, slackLink: string, overrideDatabaseId?: string, overrideToken?: string): Promise<string> {
+    if (overrideToken) {
+        this.notion = new Client({ auth: overrideToken });
+    }
     const targetDatabaseId = overrideDatabaseId || this.databaseId;
     if (!targetDatabaseId) {
         throw new Error('Notion Database ID is missing.');
@@ -39,7 +93,7 @@ export class NotionService {
     // Construct blocks
     const children: any[] = [];
 
-    // Status (Callout)
+    // Status (Callout) - Keep as a special header item
     if (adr.status) {
         children.push({
             callout: {
@@ -50,62 +104,10 @@ export class NotionService {
         });
     }
 
-    // Context
-    children.push(
-        { heading_2: { rich_text: [{ text: { content: 'Context' } }] } },
-        { paragraph: { rich_text: [{ text: { content: this.cleanText(adr.context) } }] } }
-    );
+    // Dynamic content from other fields
+    children.push(...this.buildBlocksRecursive(adr, 2));
 
-    // Decision
-    children.push(
-        { heading_2: { rich_text: [{ text: { content: 'Decision' } }] } },
-        { paragraph: { rich_text: [{ text: { content: this.cleanText(adr.decision) } }] } }
-    );
-
-    // Drivers
-    if (adr.drivers && adr.drivers.length > 0) {
-        children.push({ heading_2: { rich_text: [{ text: { content: 'Drivers' } }] } });
-        adr.drivers.forEach(driver => {
-            children.push({
-                bulleted_list_item: {
-                    rich_text: [{ text: { content: this.cleanText(driver) } }]
-                }
-            });
-        });
-    }
-
-    // Alternatives Considered
-    if (adr.alternatives_considered && adr.alternatives_considered.length > 0) {
-        children.push({ heading_2: { rich_text: [{ text: { content: 'Alternatives Considered' } }] } });
-        adr.alternatives_considered.forEach(alt => {
-            children.push(
-                {
-                    heading_3: {
-                        rich_text: [{ text: { content: `${this.cleanText(alt.option)} (${this.cleanText(alt.decision)})` } }]
-                    }
-                },
-                {
-                    paragraph: {
-                        rich_text: [{ text: { content: this.cleanText(alt.reasoning) } }]
-                    }
-                }
-            );
-        });
-    }
-
-    // Consequences
-    children.push({ heading_2: { rich_text: [{ text: { content: 'Consequences' } }] } });
-    if (Array.isArray(adr.consequences)) {
-        adr.consequences.forEach(cons => {
-            children.push({
-                bulleted_list_item: {
-                    rich_text: [{ text: { content: this.cleanText(cons) } }]
-                }
-            });
-        });
-    } else {
-        children.push({ paragraph: { rich_text: [{ text: { content: this.cleanText(adr.consequences) } }] } });
-    }
+    children.push({ divider: {} });
 
     children.push({ divider: {} });
 
@@ -155,7 +157,10 @@ export class NotionService {
     }
   }
 
-  public async createErrorLogPage(prompt: string, slackLink: string, overrideDatabaseId?: string): Promise<string> {
+  public async createErrorLogPage(prompt: string, slackLink: string, overrideDatabaseId?: string, overrideToken?: string): Promise<string> {
+    if (overrideToken) {
+        this.notion = new Client({ auth: overrideToken });
+    }
     const targetDatabaseId = overrideDatabaseId || this.databaseId;
     if (!targetDatabaseId) {
         throw new Error('Notion Database ID is missing.');

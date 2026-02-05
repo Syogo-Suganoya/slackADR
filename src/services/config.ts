@@ -15,6 +15,13 @@ export interface ChannelConfig {
   triggerEmoji?: string;
 }
 
+export interface WorkspaceConfig {
+  workspaceId: string;
+  notionAccessToken?: string | null;
+  notionBotId?: string | null;
+  notionOwner?: any;
+}
+
 export class ConfigService {
   private prisma: PrismaClient;
 
@@ -44,12 +51,35 @@ export class ConfigService {
     }
   }
 
+  public async getWorkspaceConfig(workspaceId: string): Promise<WorkspaceConfig | null> {
+    try {
+      const config = await this.prisma.workspaceConfig.findUnique({
+        where: { workspaceId }
+      });
+      return config ? {
+        workspaceId: config.workspaceId,
+        notionAccessToken: config.notionAccessToken,
+        notionBotId: config.notionBotId,
+        notionOwner: config.notionOwner
+      } : null;
+    } catch (error) {
+      console.error('Failed to read workspace config from database:', error);
+      return null;
+    }
+  }
+
   public async saveChannelConfig(config: ChannelConfig) {
     try {
       // Notion API から Data Source ID を取得
       let dataSourceId = config.notionDataSourceId;
       if (!dataSourceId && config.notionDatabaseId) {
-        dataSourceId = await this.fetchDataSourceId(config.notionDatabaseId);
+        // トークンが必要なため、WorkspaceConfig も取得する
+        const workspaceConfig = await this.getWorkspaceConfig(config.workspaceId);
+        const token = workspaceConfig?.notionAccessToken || process.env.NOTION_API_KEY;
+        
+        if (token) {
+           dataSourceId = await this.fetchDataSourceId(config.notionDatabaseId, token);
+        }
       }
 
       await this.prisma.channelConfig.upsert({
@@ -75,18 +105,33 @@ export class ConfigService {
     }
   }
 
+  public async saveWorkspaceConfig(config: WorkspaceConfig) {
+    try {
+      await this.prisma.workspaceConfig.upsert({
+        where: { workspaceId: config.workspaceId },
+        update: {
+          notionAccessToken: config.notionAccessToken,
+          notionBotId: config.notionBotId,
+          notionOwner: config.notionOwner as any
+        },
+        create: {
+          workspaceId: config.workspaceId,
+          notionAccessToken: config.notionAccessToken,
+          notionBotId: config.notionBotId,
+          notionOwner: config.notionOwner as any
+        }
+      });
+    } catch (error) {
+      console.error('Failed to save workspace config to database:', error);
+    }
+  }
+
   /**
    * Notion API から Data Source ID を取得
    */
-  private async fetchDataSourceId(databaseId: string): Promise<string | null> {
+  private async fetchDataSourceId(databaseId: string, token: string): Promise<string | null> {
     try {
-      const notionApiKey = process.env.NOTION_API_KEY;
-      if (!notionApiKey) {
-        console.warn('NOTION_API_KEY is not set, cannot fetch data source ID');
-        return null;
-      }
-
-      const notion = new NotionClient({ auth: notionApiKey });
+      const notion = new NotionClient({ auth: token });
       const database = await notion.databases.retrieve({ database_id: databaseId }) as any;
       
       if (database.data_sources && database.data_sources.length > 0) {

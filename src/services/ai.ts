@@ -8,11 +8,13 @@ export interface ADRData {
   title: string;
   tags: string[];
   status?: string;
+  date?: string;
+  deciders?: string[];
   context: string;
   decision: string;
   drivers?: string[];
-  alternatives_considered?: { option: string, decision: string, reasoning: string }[];
-  consequences: string | string[];
+  alternatives_considered?: (string | { option: string, decision: string, reasoning: string })[];
+  consequences: string | string[] | { positive?: string[], negative?: string[] };
   manualPrompt?: string;
 }
 
@@ -38,7 +40,7 @@ Do NOT use Markdown formatting (like **, _, [links], etc.) in any of the JSON st
     this.notion = new NotionService();
   }
 
-  public async generateADR(threadText: string, slackLink: string, overrideConfig?: { geminiApiKey?: string, notionDatabaseId?: string }): Promise<ADRData> {
+  public async generateADR(threadText: string, slackLink: string, overrideConfig?: { geminiApiKey?: string, notionDatabaseId?: string, notionAccessToken?: string }): Promise<ADRData> {
     this.lastErrorNotionUrl = null;
 
     let genAI = this.genAI;
@@ -100,7 +102,7 @@ Do NOT use Markdown formatting (like **, _, [links], etc.) in any of the JSON st
       
       // Save full prompt to Notion on error for manual processing
       try {
-        this.lastErrorNotionUrl = await this.saveErrorToNotion(prompt, slackLink, overrideConfig?.notionDatabaseId);
+        this.lastErrorNotionUrl = await this.saveErrorToNotion(prompt, slackLink, overrideConfig?.notionDatabaseId, overrideConfig?.notionAccessToken);
       } catch (innerErr) {
         console.error('Failed to save to Notion after AI error:', innerErr);
       }
@@ -110,9 +112,9 @@ Do NOT use Markdown formatting (like **, _, [links], etc.) in any of the JSON st
   }
 
 
-  private async saveErrorToNotion(prompt: string, slackLink: string, overrideDatabaseId?: string): Promise<string | null> {
+  private async saveErrorToNotion(prompt: string, slackLink: string, overrideDatabaseId?: string, notionAccessToken?: string): Promise<string | null> {
     try {
-      const url = await this.notion.createErrorLogPage(prompt, slackLink, overrideDatabaseId);
+      const url = await this.notion.createErrorLogPage(prompt, slackLink, overrideDatabaseId, notionAccessToken);
       console.log(`💾 Error prompt saved to Notion: ${url}`);
       return url;
     } catch (err) {

@@ -9,16 +9,27 @@ const notionService = new NotionService();
 const configService = new ConfigService();
 
 export const registerSlackHandlers = (app: App) => {
-  app.event('reaction_added', async ({ event, client, logger }) => {
+  app.event('reaction_added', async ({ event, client, logger, body }) => {
     logger.info(`Received reaction: ${event.reaction} from ${event.user} in ${event.item.channel}`);
 
     // 1. Check config
+    const workspaceId = (body as any).team_id;
     const config = await configService.getChannelConfig(event.item.channel);
-    logger.info('Current channel config:', config);
-
+    const workspaceConfig = await configService.getWorkspaceConfig(workspaceId);
+    
+    const token = workspaceConfig?.notionAccessToken;
     const triggerEmoji = config?.triggerEmoji || 'decision';
 
     if (event.reaction !== triggerEmoji) {
+      return;
+    }
+
+    if (!token && !process.env.NOTION_API_KEY) {
+      await client.chat.postMessage({
+        channel: event.item.channel,
+        thread_ts: event.item.ts,
+        text: ':warning: Notion 連携が完了していません。`/adr-config` から Notion と連携してください。'
+      });
       return;
     }
 
@@ -54,7 +65,8 @@ export const registerSlackHandlers = (app: App) => {
       if (!thread.messages) return;
 
       // Combine text (User: Message)
-      const threadText = thread.messages
+      const threadText = (thread.messages as any[])
+        .filter(m => !m.bot_id && m.subtype !== 'bot_message')
         .map(m => {
             const user = m.user || 'Unknown';
             const text = m.text || '';
@@ -72,10 +84,11 @@ export const registerSlackHandlers = (app: App) => {
       // 5. Generate ADR with AI
       const adrData = await aiService.generateADR(threadText, slackLink, {
         geminiApiKey: config?.geminiApiKey || undefined,
-        notionDatabaseId: config?.notionDatabaseId
+        notionDatabaseId: config?.notionDatabaseId,
+        notionAccessToken: token || undefined
       });
       // 6. Create Notion Page
-      const notionUrl = await notionService.createADRPage(adrData, slackLink, config?.notionDatabaseId);
+      const notionUrl = await notionService.createADRPage(adrData, slackLink, config?.notionDatabaseId, token || undefined);
 
       // 6. Post Summary to Slack
       await client.chat.postMessage({
@@ -103,7 +116,8 @@ export const registerSlackHandlers = (app: App) => {
 
     try {
       const config = await configService.getChannelConfig(body.channel_id);
-      
+      const workspaceConfig = await configService.getWorkspaceConfig(body.team_id);
+      const workspaceId = workspaceConfig?.notionAccessToken ? body.team_id : null;
       await client.views.open({
         trigger_id: body.trigger_id,
         view: {
@@ -118,6 +132,29 @@ export const registerSlackHandlers = (app: App) => {
             {
               type: 'section',
               text: { type: 'mrkdwn', text: 'ADR 生成のための基本設定を行います。チャンネルごとに異なる Notion データベースを指定できます。' }
+            },
+            {
+                type: 'divider'
+            },
+            {
+                type: 'section',
+                text: { 
+                    type: 'mrkdwn', 
+                    text: '*1. Notion 連携*' + (workspaceId ? '\n(連携済み :white_check_mark:)' : '\n(連携が必要です :warning:)')
+                },
+                accessory: {
+                    type: 'button',
+                    text: { type: 'plain_text', text: 'Notion と連携する' },
+                    url: `${process.env.APP_URL || 'http://localhost:3000'}/auth/notion?workspace_id=${body.team_id}`,
+                    action_id: 'notion_auth_button'
+                }
+            },
+            {
+                type: 'divider'
+            },
+            {
+                type: 'section',
+                text: { type: 'mrkdwn', text: '*2. チャンネル設定*' }
             },
             {
               type: 'input',

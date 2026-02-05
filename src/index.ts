@@ -2,6 +2,7 @@ import { App, ExpressReceiver } from '@slack/bolt';
 import dotenv from 'dotenv';
 import { registerSlackHandlers } from './handlers/slack';
 import { NotionService } from './services/notion';
+import { handleNotionAuthStart, handleNotionCallback } from './routes/notion-auth';
 
 dotenv.config();
 
@@ -47,6 +48,10 @@ receiver.app.post('/recovery', async (req, res) => {
     res.status(500).send('Recovery process failed');
   }
 });
+
+// Notion OAuth Endpoints
+receiver.app.get('/auth/notion', handleNotionAuthStart);
+receiver.app.get('/notion/callback', handleNotionCallback);
 
 // Custom Health Check
 receiver.app.get('/', (req, res) => {
