@@ -14,3 +14,4 @@ demo/*
 /src/generated/prisma
 SLACK_APP_RELEASE.md
 *.log
+QIITA_POST.md
