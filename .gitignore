@@ -2,16 +2,6 @@ node_modules
 dist
 .env
 .DS_Store
-
-DEPLOYMENT.md
-DISTRIBUTION.md
-MULTI_TENANT_CONFIG.md
-NOTION_PUBLIC_AUTH.md
-SLACK_APP_SETUP.md
 demo/*
-.github/workflows/notion-recovery.yml
-
 /src/generated/prisma
-SLACK_APP_RELEASE.md
 *.log
-QIITA_POST.md
