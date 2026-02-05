@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npx prisma migrate deploy && npm run start
+    startCommand: npx prisma db push --accept-data-loss && npm run start
     envVars:
       - key: DATABASE_URL
         fromDatabase:
