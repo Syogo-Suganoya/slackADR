@@ -1,3 +1,4 @@
+```typescript
 import { App, ExpressReceiver } from '@slack/bolt';
 import dotenv from 'dotenv';
 import { registerSlackHandlers } from './handlers/slack';
@@ -25,6 +26,7 @@ const receiver = new ExpressReceiver({
 // Initialize the App
 const app = new App({
   receiver,
+  installationStore,
 });
 
 // Register Handlers

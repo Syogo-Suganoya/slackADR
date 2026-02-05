@@ -46,11 +46,13 @@ export class SlackInstallationStore implements InstallationStore {
     userId?: string;
     isEnterpriseInstall?: boolean;
   }): Promise<Installation> {
+    console.log(`[DEBUG] Fetching installation for teamId: ${installQuery.teamId}`);
     const record = await (prisma as any).slackInstallation.findUnique({
       where: { teamId: installQuery.teamId || '' },
     });
 
     if (!record) {
+      console.warn(`[WARN] Installation not found for teamId: ${installQuery.teamId}`);
       throw new Error('Installation not found');
     }
 
