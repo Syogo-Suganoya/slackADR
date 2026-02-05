@@ -19,8 +19,20 @@ const receiver = new ExpressReceiver({
   stateSecret: process.env.SLACK_STATE_SECRET,
   scopes: ['channels:history', 'groups:history', 'chat:write', 'commands', 'reactions:read'],
   installationStore,
+  installerOptions: {
+    redirectUri: process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, '')}/slack/oauth_redirect` : undefined,
+    stateVerification: true,
+  } as any,
   processBeforeResponse: true,
 });
+
+// Debug environment variables (masked)
+console.log(`[DEBUG] APP_URL: ${process.env.APP_URL}`);
+console.log(`[DEBUG] SLACK_CLIENT_ID: ${process.env.SLACK_CLIENT_ID ? 'set' : 'MISSING'}`);
+console.log(`[DEBUG] SLACK_STATE_SECRET: ${process.env.SLACK_STATE_SECRET ? 'set' : 'MISSING'}`);
+
+// Trust proxy for Render (required for secure cookies)
+receiver.app.set('trust proxy', 1);
 
 // Initialize the App
 const app = new App({
@@ -33,6 +45,9 @@ registerSlackHandlers(app);
 
 // Debug: Log all incoming requests
 receiver.app.use((req, res, next) => {
+  if (req.path === '/slack/oauth_redirect') {
+    console.log(`[DEBUG] OAuth Callback Params: state=${req.query.state ? 'exists' : 'MISSING'}, code=${req.query.code ? 'exists' : 'MISSING'}`);
+  }
   console.log(`[DEBUG] ${req.method} ${req.path}`);
   next();
 });
