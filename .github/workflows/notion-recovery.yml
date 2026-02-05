@@ -1,0 +1,17 @@
+name: Notion ADR Recovery
+
+on:
+  schedule:
+    # 5分ごとに実行 (UTC)
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # 手動実行も可能にする
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Recovery on Render
+        run: |
+          curl -X POST "${{ secrets.APP_URL }}/recovery" \
+               -H "x-recovery-token: ${{ secrets.RECOVERY_TOKEN }}" \
+               -f # エラー時にジョブを失敗させる
