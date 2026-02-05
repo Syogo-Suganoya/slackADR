@@ -80,7 +80,6 @@ sequenceDiagram
     participant N as Notion API
 
     %% 成功ケース
-    rect rgb(230, 245, 230)
     Note over U, N: 正常系フロー
     U->>S: リアクション (:decision:)
     S->>B: reaction_added イベント
@@ -90,22 +89,19 @@ sequenceDiagram
     B->>N: pages.create (ADR生成)
     N-->>B: Notion ページ URL
     B->>S: chat.postMessage (完了通知)
-    end
 
-    %% エラーリカバリーケース
-    rect rgb(255, 245, 230)
+    %% エラーリカバリーフロー
     Note over U, N: エラーリカバリーフロー
     B->>A: generateContent (失敗)
-    A-->>B: Error (Quota etc.)
-    B->>N: pages.create (エラーログ作成)
-    B->>S: chat.postMessage (エラー通知 & ログURL)
-    U->>N: 手動で JSON 貼付 & Tag を "Ready" に変更
+    A-->>B: "Error (Quota etc.)"
+    B->>N: "pages.create (エラーログ作成)"
+    B->>S: "chat.postMessage (エラー通知 & ログURL)"
+    U->>N: "手動で JSON 貼付 & Tag を \"Ready\" に変更"
     Note over B: 5分ごとのバッチ処理 (GitHub Actions)
-    B->>N: dataSources.query ("Ready" 検知)
+    B->>N: "dataSources.query (\"Ready\" 検知)"
     N-->>B: ページ詳細
-    B->>N: pages.create (ADR生成 & 旧ページアーカイブ)
+    B->>N: "pages.create (ADR生成 & 旧ページアーカイブ)"
     B->>S: chat.postMessage (完了通知)
-    end
 ```
 
 ## 4. データモデル (ER Diagram)
