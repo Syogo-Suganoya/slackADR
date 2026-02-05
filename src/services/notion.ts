@@ -320,4 +320,27 @@ export class NotionService {
       return [];
     }
   }
+
+  public async findBestDatabase(token: string): Promise<string | null> {
+    const databases = await this.listDatabases(token);
+    if (databases.length === 0) return null;
+
+    // 1. Look for a database with "ADR" in the title
+    const adrDb = databases.find(db => db.title.toUpperCase().includes('ADR'));
+    if (adrDb) return adrDb.id;
+
+    // 2. Fallback to the first database found
+    return databases[0].id;
+  }
+
+  public async validateDatabase(databaseId: string, token?: string): Promise<boolean> {
+    const notion = token ? new Client({ auth: token }) : this.notion;
+    try {
+      await notion.databases.retrieve({ database_id: databaseId });
+      return true;
+    } catch (error) {
+      console.error(`Database validation failed for ${databaseId}:`, error);
+      return false;
+    }
+  }
 }
