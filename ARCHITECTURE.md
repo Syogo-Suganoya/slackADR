@@ -1,14 +1,14 @@
 # System Architecture
 
-このドキュメントでは、Slack ADR Bot のシステム構成と動作原理について説明します。
+This document describes the system configuration and operating principles of the Slack ADR Bot.
 
-## 1. システム全体像 (System Overview)
+## 1. System Overview
 
-Slack スレッドから ADR が生成され、Notion に保存されるまでの全体的なフローです。
+This diagram shows the end-to-end flow from when a discussion occurs in a Slack thread until the ADR is generated and saved in Notion.
 
 ```mermaid
 graph TD
-    User([ユーザー]) -- "議論後、:decision: を追加" --> Slack[Slack Workspace]
+    User([User]) -- "Adds :decision: after discussion" --> Slack[Slack Workspace]
     Slack -- "Reaction Event" --> Bot[Slack ADR Bot]
     
     subgraph Bot [Slack ADR Bot]
@@ -19,22 +19,22 @@ graph TD
         DB[(PostgreSQL)]
     end
     
-    Handler -- "config 確認" --> DB
-    Handler -- "スレッド取得" --> Slack
-    Handler -- "要約依頼" --> AI
-    AI -- "プロンプト送信" --> Gemini[Gemini API]
+    Handler -- "Check config" --> DB
+    Handler -- "Fetch thread" --> Slack
+    Handler -- "Request summary" --> AI
+    AI -- "Send prompt" --> Gemini[Gemini API]
     Gemini -- "JSON" --> AI
-    AI -- "ページ作成依頼" --> Notion
+    AI -- "Request page creation" --> Notion
     Notion -- "API Call" --> NotionAPI[Notion API]
-    NotionAPI -- "ADR作成" --> NotionDB[(Notion Database)]
+    NotionAPI -- "Create ADR" --> NotionDB[(Notion Database)]
     
-    Notion -- "URL返却" --> Handler
-    Handler -- "完了通知" --> Slack
+    Notion -- "Return URL" --> Handler
+    Handler -- "Success notification" --> Slack
 ```
 
-## 2. コンポーネント構成 (Component Diagram)
+## 2. Component Diagram
 
-システムの内部コンポーネントと外部依存関係の構成です。
+The internal components of the system and their external dependencies.
 
 ```mermaid
 classDiagram
@@ -59,17 +59,17 @@ classDiagram
         +saveChannelConfig(config)
     }
 
-    Index --> SlackHandler : 登録
-    SlackHandler --> AIService : 要約生成
-    SlackHandler --> NotionService : ページ作成
-    SlackHandler --> ConfigService : 設定取得
-    AIService --> NotionService : エラーログ保存
-    ConfigService --> Prisma : DBアクセス
+    Index --> SlackHandler : Register
+    SlackHandler --> AIService : Generate Summary
+    SlackHandler --> NotionService : Create Page
+    SlackHandler --> ConfigService : Get Config
+    AIService --> NotionService : Save Error Log
+    ConfigService --> Prisma : DB Access
 ```
 
-## 3. シーケンス図 (Sequence Diagram)
+## 3. Sequence Diagram
 
-ADR 生成の成功フローと、エラー時のリカバリーフローの詳細です。
+Details of the successful ADR generation flow and the error recovery flow.
 
 ```mermaid
 sequenceDiagram
@@ -79,34 +79,34 @@ sequenceDiagram
     participant A as Gemini API
     participant N as Notion API
 
-    %% 成功ケース
-    Note over U, N: 正常系フロー
-    U->>S: リアクション (:decision:)
-    S->>B: reaction_added イベント
-    B->>S: conversations.replies (スレッド取得)
-    B->>A: generateContent (プロンプト)
-    A-->>B: ADR JSON データ
-    B->>N: pages.create (ADR生成)
-    N-->>B: Notion ページ URL
-    B->>S: chat.postMessage (完了通知)
+    %% Success Case
+    Note over U, N: Success Flow
+    U->>S: Reaction (:decision:)
+    S->>B: reaction_added event
+    B->>S: conversations.replies (Fetch thread)
+    B->>A: generateContent (Prompt)
+    A-->>B: ADR JSON data
+    B->>N: pages.create (Create ADR)
+    N-->>B: Notion page URL
+    B->>S: chat.postMessage (Success notification)
 
-    %% エラーリカバリーフロー
-    Note over U, N: エラーリカバリーフロー
-    B->>A: generateContent (失敗)
+    %% Error Recovery Flow
+    Note over U, N: Error Recovery Flow
+    B->>A: generateContent (Fail)
     A-->>B: "Error (Quota etc.)"
-    B->>N: "pages.create (エラーログ作成)"
-    B->>S: "chat.postMessage (エラー通知 & ログURL)"
-    U->>N: "手動で JSON 貼付 & Tag を \"Ready\" に変更"
-    Note over B: 5分ごとのバッチ処理 (GitHub Actions)
-    B->>N: "dataSources.query (\"Ready\" 検知)"
-    N-->>B: ページ詳細
-    B->>N: "pages.create (ADR生成 & 旧ページアーカイブ)"
-    B->>S: chat.postMessage (完了通知)
+    B->>N: "pages.create (Create error log)"
+    B->>S: "chat.postMessage (Error notification & Log URL)"
+    U->>N: "Manually paste JSON & Change Tag to \"Ready\""
+    Note over B: Batch process every 5 minutes (GitHub Actions)
+    B->>N: "dataSources.query (Detect \"Ready\")"
+    N-->>B: Page details
+    B->>N: "pages.create (Create ADR & Archive old page)"
+    B->>S: chat.postMessage (Success notification)
 ```
 
-## 4. データモデル (ER Diagram)
+## 4. Data Model (ER Diagram)
 
-Prisma で管理されているデータベースの構造です。
+The structure of the database managed by Prisma.
 
 ```mermaid
 erDiagram
