@@ -1,107 +1,111 @@
 # Slack ADR Bot & Notion Recovery
-![alt text](image/readme/thumbnail.png)
+![alt text](image/readme/thumbnail_en.jpg)
 
-Slack の会話からアーキテクチャ意思決定記録 (ADR) を自動生成し、Notion で管理するためのツールです。
-AI (Gemini) を使用して議論を要約し、データベース化します。
+A tool to automatically generate Architecture Decision Records (ADRs) from Slack conversations and manage them in Notion.
+Uses AI (Gemini) to summarize discussions and store them in a database.
 
-## 🌟 主な機能
-- **Slack 連携**: スレッドの `:decision:` リアクションで ADR 作成を開始
-- **AI 自動解析**: Gemini API が議論をコンテキスト、決定事項、影響に分類
-- **Notion 管理**: 整形された ADR を Notion データベースに保存
-- **自動リカバリー**: AI 解析に失敗した場合も Notion にログを残し、後から一括リカバリー可能
-- **チャンネルごとの設定**: `/adr-config` で Notion データベースを個別に設定可能
+[Japanese](./README_ja.md) | **English**
 
-## 📖 使い方
+## 🌟 Key Features
+- **Slack Integration**: Start ADR creation with a `:decision:` reaction in a thread.
+- **AI Auto-Analysis**: Gemini API categorizes discussions into context, decisions, and consequences.
+- **Notion Management**: Saves formatted ADRs to a Notion database.
+- **Auto-Recovery**: Even if AI analysis fails, logs are kept in Notion for batch recovery later.
+- **Channel-specific Settings**: Configure Notion databases individually for each channel via `/adr-config`.
+
+## 🏗️ Architecture
+For operating principles and detailed diagrams, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+## 📖 Usage
 
 ```mermaid
 graph TD
-    %% 初期設定フェーズ
-    subgraph Setup ["<font color='#01579B'>0. 初期設定 (初回のみ)</font>"]
-        A[Notion DB作成 & プロパティ設定] --> B[Notionコネクト追加]
-        B --> C[Slackアプリをチャンネルに招待]
-        C --> D["/adr-config でDB接続設定"]
+    %% Setup Phase
+    subgraph Setup ["<font color='#01579B'>0. Initial Setup (Once only)</font>"]
+        A[Create Notion DB & Set Properties] --> B[Add Notion Connection]
+        B --> C[Invite Slack App to Channel]
+        C --> D["/adr-config to connect DB"]
     end
 
-    %% 通常運用フェーズ
-    subgraph Usage ["<font color='#2E7D32'>1. 通常のADR作成フロー</font>"]
-        E[Slackスレッドで議論] --> F["親メッセージに :decision: リアクション"]
-        F --> G{AI解析成功?}
-        G -- Yes --> H[NotionにADRを自動生成]
-        H --> I[Slackに完了通知]
+    %% Usage Phase
+    subgraph Usage ["<font color='#2E7D32'>1. Normal ADR Creation Flow</font>"]
+        E[Discuss in Slack Thread] --> F["Add :decision: reaction to parent"]
+        F --> G{AI Analysis Success?}
+        G -- Yes --> H[Auto-generate ADR in Notion]
+        H --> I[Slack Notification]
     end
 
-    %% リカバリーフェーズ
-    subgraph Recovery ["<font color='#F57F17'>2. エラー時のリカバリー</font>"]
-        G -- No --> J[Notionにエラーログを作成]
-        J --> K[Slackにエラー通知]
-        K --> L[外部AIにプロンプトを手動入力]
-        L --> M[JSONレスポンスをNotionに貼り付け]
-        M --> N["Tagsを 'Ready' に変更"]
-        N --> O[5分おきのバッチ処理が自動検知]
+    %% Recovery Phase
+    subgraph Recovery ["<font color='#F57F17'>2. Error Recovery</font>"]
+        G -- No --> J[Create Error Log in Notion]
+        J --> K[Slack Error Notification]
+        K --> L[Manually Input Prompt to External AI]
+        L --> M[Paste JSON Response to Notion]
+        M --> N["Change Tags to 'Ready'"]
+        N --> O[Batch Process Detects Every 5 Mins]
         O --> H
     end
 
-    %% スタイル定義
+    %% Style Definitions
     style Setup fill:#E1F5FE,stroke:#01579B,stroke-width:2px
     style Usage fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px
     style Recovery fill:#FFFDE7,stroke:#FBC02D,stroke-width:2px
 ```
 
-### 0. Notion データベースの準備
+### 0. Prepare Notion Database
 ![alt text](image/readme/emp.jpg)
 
-ADR を保存するための Notion データベースを作成します。
+Create a Notion database to store ADRs.
 
-1. **新しいページを作成**: Notion で新しいページを作成し、「テーブル - インライン」を選択
-2. **必須プロパティの追加**: 以下のプロパティが必要です（大文字・小文字を正確に入力してください）
-   - `Name` (タイトル) - デフォルトで存在
-   - `Tags` (マルチセレクト) - リカバリー機能で使用（`Ready` タグを追加）
-   - `SlackLink` (URL) - Slack スレッドへのリンク
-3. **コネクトの追加**: ページ右上の「︙」→「コネクト」→「新しいコネクト」を選択し、ADR データベースを追加
-4. **データベース URL をコピー**: ブラウザのアドレスバーから URL をコピー（後で `/adr-config` で使用）
+1. **Create a new page**: Select "Table - Inline" in Notion.
+2. **Add required properties**: (Case-sensitive)
+   - `Name` (Title) - Exists by default.
+   - `Tags` (Multi-select) - Used for recovery (`Ready` tag).
+   - `SlackLink` (URL) - Link to the Slack thread.
+3. **Add Connection**: Click "..." at top right -> "Connections" -> "Connect to" and add the ADR integration.
+4. **Copy Database URL**: Copy the URL from the browser address bar (used in `/adr-config`).
 
-### 1. Slack アプリをワークスペースに追加
+### 1. Add Slack App to Workspace
 ![alt text](image/readme/invite.jpg)
-1. Slack API ダッシュボードでアプリを作成・設定
-2. ワークスペースにインストール
-3. ADR を作成したいチャンネルにアプリを招待（`/invite @アプリ名`）
+1. Create and configure the app in the Slack API Dashboard.
+2. Install to your workspace.
+3. Invite the app to the channel ( `/invite @app_name` ).
 
-### 2. チャンネルごとの設定
+### 2. Channel-specific Configuration
 ![alt text](image/readme/adr_command.jpg)
 ![alt text](image/readme/model.jpg)
 
-チャンネルで `/adr-config` を実行し、モーダルに以下を入力：
-- **Notion Database URL**: ADR を保存する Notion データベースの URL
-- **Gemini API Key** (オプション): チャンネル専用の API キーを使う場合
-- **Trigger Emoji**: ADR 作成のトリガーとなる絵文字（デフォルト: `decision`）
+Run `/adr-config` in the channel and enter:
+- **Notion Database URL**: The URL where ADRs will be saved.
+- **Gemini API Key** (Optional): If you want to use a channel-specific API key.
+- **Trigger Emoji**: The emoji that triggers ADR creation (Default: `decision`).
 
-「保存」をクリックすると、設定が PostgreSQL に保存されます。
+Settings are saved to PostgreSQL.
 
-### 3. 絵文字の追加（必要に応じて）
-**Trigger Emoji**の絵文字がない場合は、Slack ワークスペースにカスタム絵文字を追加してください。
+### 3. Add Emoji (if needed)
+If the **Trigger Emoji** does not exist, add it as a custom emoji to your Slack workspace.
 
-### 4. ADR の作成
+### 4. Create ADR
 
 |  |  |
 | - | - |
 | <img src="image/readme/thread.jpg" width="600"> | <img src="image/readme/create.jpg" width="600"> |
 
+1. Discuss in a Slack thread.
+2. Add the **Trigger Emoji** as a reaction to the parent message of the thread.
+3. The bot automatically analyzes the thread and creates an ADR in Notion.
+4. A link to the Notion page will be posted to Slack upon completion.
 
-1. Slack のスレッドで議論を行う
-2. スレッドの親メッセージに設定した**Trigger Emoji**をリアクションとして追加
-3. Bot が自動的にスレッド全体を解析し、ADR を Notion に作成
-4. 作成完了後、Slack に Notion ページのリンクが通知されます
+### 5. AI Error Recovery Procedure
+If the AI API quota is exceeded or an error occurs:
 
-### 5. AI エラー時のリカバリー手順
-AI API のクォータ超過やエラーが発生した場合：
-
-1. **エラーログの確認**: Slack に Notion のエラーログページのリンクが通知されます
-2. **手動でプロンプトを送信**: 
-   - エラーログページに記載されているプロンプトをコピー
-   - ブラウザで Gemini や ChatGPT などの AI にプロンプトを送信
-   - レスポンスを JSON 形式で取得
-3. **Notion に結果を入力**:
-   - エラーログページの **JSON Summary Input** に AI のレスポンスを貼り付け
-   - `Tags` プロパティを `Ready` に変更
-4. **自動リカバリー**: 5分おきに実行されるバッチ処理が `Ready` タグのページを検出し、ADR を自動作成
-5. **完了通知**: ADR が作成されると、Slack に通知が届きます
+1. **Check Error Log**: A link to the Notion error log page will be posted to Slack.
+2. **Manually Send Prompt**:
+   - Copy the prompt from the error log page.
+   - Send the prompt to an AI like Gemini or ChatGPT.
+   - Get the response in JSON format.
+3. **Input Result into Notion**:
+   - Paste the AI-generated JSON into the **JSON Summary Input** in the error log page.
+   - Change the `Tags` property to `Ready`.
+4. **Auto-Recovery**: A batch process runs every 5 minutes, detects pages with the `Ready` tag, and creates the ADR.
+5. **Completion**: Notification will be sent to Slack once created.
