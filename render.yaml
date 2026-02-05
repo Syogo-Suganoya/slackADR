@@ -20,6 +20,14 @@ services:
         sync: false
       - key: NOTION_DATABASE_ID
         sync: false
+      - key: NOTION_CLIENT_ID
+        sync: false
+      - key: NOTION_CLIENT_SECRET
+        sync: false
+      - key: NOTION_REDIRECT_URI
+        sync: false
+      - key: APP_URL
+        sync: false
 
 databases:
   - name: slack-adr-db
