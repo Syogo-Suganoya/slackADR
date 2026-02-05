@@ -1,77 +1,81 @@
 import { Request, Response } from 'express';
-import axios from 'axios';
+import { NotionService } from '../services/notion';
 import { ConfigService } from '../services/config';
 
+const notionService = new NotionService();
 const configService = new ConfigService();
 
-/**
- * 1. Notion 連携開始 (Slack からのリダイレクト先)
- * GET /auth/notion?workspace_id=...
- */
 export const handleNotionAuthStart = async (req: Request, res: Response) => {
-  const workspaceId = req.query.workspace_id as string;
-  if (!workspaceId) {
-    return res.status(400).send('workspace_id is required');
+  const { workspaceId, channelId, userId } = req.query;
+
+  if (!workspaceId || !channelId || !userId) {
+    return res.status(400).send('Missing required parameters: workspaceId, channelId, userId');
   }
 
-  const clientId = process.env.NOTION_CLIENT_ID;
-  const redirectUri = process.env.NOTION_REDIRECT_URI;
-
-  if (!clientId || !redirectUri) {
-    return res.status(500).send('OAuth configuration missing');
-  }
-
-  // state に workspace_id を含めて Notion に送る
-  const state = encodeURIComponent(JSON.stringify({ workspaceId }));
-  const authUrl = `https://api.notion.com/v1/oauth/authorize?owner=user&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${state}`;
+  // Encode state
+  const state = JSON.stringify({ workspaceId, channelId, userId });
+  const authUrl = notionService.getAuthorizationUrl(Buffer.from(state).toString('base64'));
 
   res.redirect(authUrl);
 };
 
-/**
- * 2. Notion からのリダイレクト受け取り
- * GET /notion/callback?code=...&state=...
- */
 export const handleNotionCallback = async (req: Request, res: Response) => {
-  const code = req.query.code as string;
-  const stateStr = req.query.state as string;
+  const { code, state, error } = req.query;
 
-  if (!code || !stateStr) {
+  if (error) {
+    return res.status(400).send(`Notion Authorization Failed: ${error}`);
+  }
+
+  if (!code || !state) {
     return res.status(400).send('Missing code or state');
   }
 
   try {
-    const { workspaceId } = JSON.parse(decodeURIComponent(stateStr));
+    const decodedState = JSON.parse(Buffer.from(state as string, 'base64').toString());
+    const { workspaceId } = decodedState;
+
+    console.log(`[Notion OAuth] Exchanging code for token for workspace: ${workspaceId}`);
     
-    const clientId = process.env.NOTION_CLIENT_ID;
-    const clientSecret = process.env.NOTION_CLIENT_SECRET;
-    const redirectUri = process.env.NOTION_REDIRECT_URI;
-
-    // Notion トークン交換
-    const response = await axios.post('https://api.notion.com/v1/oauth/token', {
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-    }, {
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const { access_token, bot_id, owner } = response.data;
-
-    // DB に保存
+    // Exchange code for token
+    const tokenData = await notionService.exchangeAuthCode(code as string);
+    const accessToken = tokenData.access_token;
+    const botId = tokenData.bot_id;
+    const owner = tokenData.owner;
+    
+    // Save to database
     await configService.saveWorkspaceConfig({
-      workspaceId,
-      notionAccessToken: access_token,
-      notionBotId: bot_id,
+      workspaceId: workspaceId,
+      notionAccessToken: accessToken,
+      notionBotId: botId,
       notionOwner: owner
     });
 
-    res.send('Notion 連携が完了しました！この画面を閉じて Slack に戻ってください。');
-  } catch (error: any) {
-    console.error('Notion OAuth Error:', error.response?.data || error.message);
-    res.status(500).send('Notion 連携に失敗しました。');
+    console.log(`[Notion OAuth] Token saved for workspace: ${workspaceId}`);
+
+    // Render success page
+    res.send(`
+      <html>
+        <head>
+          <title>Notion Connection Successful</title>
+          <style>
+            body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #f4f6f8; }
+            .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+            h1 { color: #2e7d32; }
+            p { color: #555; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>✅ Connection Successful!</h1>
+            <p>Slack ADR Bot has been successfully connected to your Notion workspace.</p>
+            <p>You can close this window and return to Slack.</p>
+          </div>
+        </body>
+      </html>
+    `);
+
+  } catch (err) {
+    console.error('[Notion OAuth] Error:', err);
+    res.status(500).send('Internal Server Error during Notion Authorization');
   }
 };

@@ -343,4 +343,55 @@ export class NotionService {
       return false;
     }
   }
+
+  public getAuthorizationUrl(state: string): string {
+    const clientId = process.env.NOTION_CLIENT_ID;
+    const redirectUri = process.env.NOTION_REDIRECT_URI;
+    
+    if (!clientId || !redirectUri) {
+        throw new Error('Notion Client ID or Redirect URI is missing in environment variables.');
+    }
+
+    const params = new URLSearchParams({
+        client_id: clientId,
+        response_type: 'code',
+        owner: 'user',
+        redirect_uri: redirectUri,
+        state: state
+    });
+
+    return `https://api.notion.com/v1/oauth/authorize?${params.toString()}`;
+  }
+
+  public async exchangeAuthCode(code: string): Promise<any> {
+    const clientId = process.env.NOTION_CLIENT_ID;
+    const clientSecret = process.env.NOTION_CLIENT_SECRET;
+    const redirectUri = process.env.NOTION_REDIRECT_URI;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+        throw new Error('Notion Client ID/Secret/RedirectURI is missing.');
+    }
+
+    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+    const response = await fetch('https://api.notion.com/v1/oauth/token', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: redirectUri
+        })
+    });
+
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to exchange Notion token: ${error}`);
+    }
+
+    return await response.json();
+  }
 }

@@ -31,28 +31,32 @@ Do NOT use Markdown formatting (like **, _, [links], etc.) in any of the JSON st
   `;
 
   constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey) {
-      this.genAI = new GoogleGenerativeAI(apiKey);
-    } else {
-      console.warn('GEMINI_API_KEY is not set. AI Service will operate in fallback mode.');
-    }
     this.notion = new NotionService();
   }
 
   public async generateADR(threadText: string, slackLink: string, overrideConfig?: { geminiApiKey?: string, notionDatabaseId?: string, notionAccessToken?: string }): Promise<ADRData> {
     this.lastErrorNotionUrl = null;
+    
+    // Construct prompt first to save it in case of error
+    const prompt = `${this.systemPrompt}\n\nHere is the Slack conversation:\n\n${threadText}`;
 
-    let genAI = this.genAI;
+    let genAI: GoogleGenerativeAI | null = null;
+    
     if (overrideConfig?.geminiApiKey) {
       genAI = new GoogleGenerativeAI(overrideConfig.geminiApiKey);
     }
 
     if (!genAI) {
-      throw new Error('AI API Key is missing. Please check GEMINI_API_KEY environment variable or provide one in config.');
+      // API Key missing: Save error log to Notion before throwing
+      console.warn('Gemini API Key is missing. Creating Error Log page in Notion...');
+      try {
+        this.lastErrorNotionUrl = await this.saveErrorToNotion(prompt, slackLink, overrideConfig?.notionDatabaseId, overrideConfig?.notionAccessToken);
+      } catch (e) {
+        console.error('Failed to create Error Log page:', e);
+      }
+      
+      throw new Error('Gemini API Key is not configured. An Error Log page has been created in Notion for manual recovery.');
     }
-
-    const prompt = `${this.systemPrompt}\n\nHere is the Slack conversation:\n\n${threadText}`;
 
     try {
       const model = genAI.getGenerativeModel({

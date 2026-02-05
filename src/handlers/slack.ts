@@ -116,6 +116,79 @@ export const registerSlackHandlers = (app: App) => {
 
     try {
       const config = await configService.getChannelConfig(body.channel_id);
+      const workspaceConfig = await configService.getWorkspaceConfig(body.team_id);
+      const isConnected = !!workspaceConfig?.notionAccessToken;
+
+      let blocks: any[] = [];
+
+      if (!isConnected) {
+        const installUrl = `${process.env.APP_URL}/notion/install?workspaceId=${body.team_id}&channelId=${body.channel_id}&userId=${body.user_id}`;
+        blocks = [
+          {
+            type: 'section',
+            text: { type: 'mrkdwn', text: '👋 こんにちは！ADR Bot を利用するには、まず Notion との連携が必要です。' }
+          },
+          {
+            type: 'section',
+            text: { type: 'mrkdwn', text: '以下のボタンをクリックして、Notion のワークスペースへのアクセスを許可してください（OAuth 認証）。' }
+          },
+          {
+            type: 'actions',
+            elements: [
+              {
+                type: 'button',
+                text: { type: 'plain_text', text: 'Connect to Notion 🔗' },
+                url: installUrl,
+                style: 'primary'
+              }
+            ]
+          }
+        ];
+      } else {
+        blocks = [
+          {
+            type: 'section',
+            text: { type: 'mrkdwn', text: '✅ *Notion 連携済み*\nADR 生成のためのチャンネル設定を行います。' }
+          },
+          {
+            type: 'divider'
+          },
+          {
+              type: 'input',
+              block_id: 'notion_url_block',
+              label: { type: 'plain_text', text: 'Notion Database URL' },
+              element: {
+                type: 'plain_text_input',
+                action_id: 'notion_url_input',
+                initial_value: config?.notionDatabaseId ? `https://www.notion.so/${config.notionDatabaseId}` : '',
+                placeholder: { type: 'plain_text', text: 'https://www.notion.so/...' }
+              }
+          },
+          {
+              type: 'input',
+              block_id: 'gemini_key_block',
+              label: { type: 'plain_text', text: 'Gemini API Key (Optional)' },
+              element: {
+                type: 'plain_text_input',
+                action_id: 'gemini_key_input',
+                initial_value: config?.geminiApiKey || '',
+                placeholder: { type: 'plain_text', text: 'AI-...' }
+              },
+              optional: true
+          },
+          {
+              type: 'input',
+              block_id: 'emoji_block',
+              label: { type: 'plain_text', text: 'Trigger Emoji' },
+              element: {
+                type: 'plain_text_input',
+                action_id: 'emoji_input',
+                initial_value: config?.triggerEmoji || 'decision',
+                placeholder: { type: 'plain_text', text: 'decision' }
+              }
+          }
+        ];
+      }
       
       await client.views.open({
         trigger_id: body.trigger_id,
@@ -127,54 +200,8 @@ export const registerSlackHandlers = (app: App) => {
             workspaceId: body.team_id 
           }), 
           title: { type: 'plain_text', text: 'ADR Bot 設定' },
-          blocks: [
-            {
-              type: 'section',
-              text: { type: 'mrkdwn', text: 'ADR 生成のための基本設定を行います。まず、保存先となる *Notion データベースのURL* を入力してください。' }
-            },
-            {
-              type: 'section',
-              text: { type: 'mrkdwn', text: '> [!NOTE]\n> 最初に対象の Notion ページ（または親ページ）の「接続先」から、このインテグレーションを追加（共有）しておく必要があります。' }
-            },
-            {
-                type: 'divider'
-            },
-            {
-              type: 'input',
-              block_id: 'notion_url_block',
-              label: { type: 'plain_text', text: 'Notion Database URL' },
-              element: {
-                type: 'plain_text_input',
-                action_id: 'notion_url_input',
-                initial_value: config?.notionDatabaseId ? `https://www.notion.so/${config.notionDatabaseId}` : '',
-                placeholder: { type: 'plain_text', text: 'https://www.notion.so/...' }
-              }
-            },
-            {
-              type: 'input',
-              block_id: 'gemini_key_block',
-              label: { type: 'plain_text', text: 'Gemini API Key (Optional)' },
-              element: {
-                type: 'plain_text_input',
-                action_id: 'gemini_key_input',
-                initial_value: config?.geminiApiKey || '',
-                placeholder: { type: 'plain_text', text: 'AI-...' }
-              },
-              optional: true
-            },
-            {
-              type: 'input',
-              block_id: 'emoji_block',
-              label: { type: 'plain_text', text: 'Trigger Emoji' },
-              element: {
-                type: 'plain_text_input',
-                action_id: 'emoji_input',
-                initial_value: config?.triggerEmoji || 'decision',
-                placeholder: { type: 'plain_text', text: 'decision' }
-              }
-            }
-          ],
-          submit: { type: 'plain_text', text: '保存' }
+          blocks: blocks,
+          submit: isConnected ? { type: 'plain_text', text: '保存' } : undefined
         }
       });
     } catch (error) {
@@ -185,47 +212,55 @@ export const registerSlackHandlers = (app: App) => {
   // Modal Submission: config_modal_submit
   app.view('config_modal_submit', async ({ ack, body, view, logger }) => {
     logger.info('Modal submitted, parsing metadata...');
-    const { channelId, workspaceId } = JSON.parse(view.private_metadata);
-    logger.info(`Channel: ${channelId}, Workspace: ${workspaceId}`);
-    const values = view.state.values;
-    
-    const notionUrl = values.notion_url_block.notion_url_input.value;
-    const notionDatabaseId = configService.extractDatabaseId(notionUrl || '');
+    try {
+      const { channelId, workspaceId } = JSON.parse(view.private_metadata);
+      logger.info(`Channel: ${channelId}, Workspace: ${workspaceId}`);
+      const values = view.state.values;
+      
+      const notionUrl = values.notion_url_block.notion_url_input.value;
+      const notionDatabaseId = configService.extractDatabaseId(notionUrl || '');
 
-    if (!notionDatabaseId) {
-      await ack({
-        response_action: 'errors',
-        errors: { notion_url_block: '有効な Notion Database URL を入力してください。' }
+      logger.info(`Validating database access for ID: ${notionDatabaseId}`);
+
+      if (!notionDatabaseId) {
+        await ack({
+          response_action: 'errors',
+          errors: { notion_url_block: '有効な Notion Database URL を入力してください。' }
+        });
+        return;
+      }
+
+      // Validate access
+      const workspaceConfig = await configService.getWorkspaceConfig(workspaceId);
+      const token = workspaceConfig?.notionAccessToken || process.env.NOTION_API_KEY;
+      const isValid = await notionService.validateDatabase(notionDatabaseId, token || undefined);
+
+      if (!isValid) {
+        logger.warn(`Database validation failed for ID: ${notionDatabaseId}`);
+        await ack({
+          response_action: 'errors',
+          errors: { notion_url_block: 'データベースにアクセスできません。Notion の「接続先」からこのアプリを追加しているか確認してください。' }
+        });
+        return;
+      }
+
+      await ack(); // Success
+      logger.info('Modal submission acknowledged.');
+
+      const geminiKey = values.gemini_key_block.gemini_key_input.value;
+      const emoji = values.emoji_block.emoji_input.value;
+      
+      await configService.saveChannelConfig({
+        workspaceId,
+        channelId,
+        notionDatabaseId,
+        geminiApiKey: geminiKey || undefined,
+        triggerEmoji: emoji || undefined
       });
-      return;
+      logger.info(`Config saved for channel ${channelId} in workspace ${workspaceId}:`, { notionDatabaseId, emoji });
+    } catch (error) {
+      logger.error('Error during modal submission processing:', error);
+      // ack() cannot be called here if it was already called or if it timed out.
     }
-
-    // Validate access
-    const workspaceConfig = await configService.getWorkspaceConfig(workspaceId);
-    const token = workspaceConfig?.notionAccessToken || process.env.NOTION_API_KEY;
-    const isValid = await notionService.validateDatabase(notionDatabaseId, token || undefined);
-
-    if (!isValid) {
-      await ack({
-        response_action: 'errors',
-        errors: { notion_url_block: 'データベースにアクセスできません。Notion の「接続先」からこのアプリを追加しているか確認してください。' }
-      });
-      return;
-    }
-
-    await ack(); // Success
-
-    const geminiKey = values.gemini_key_block.gemini_key_input.value;
-    const emoji = values.emoji_block.emoji_input.value;
-    logger.info(`Extracted Database ID: ${notionDatabaseId}`);
-
-    await configService.saveChannelConfig({
-      workspaceId,
-      channelId,
-      notionDatabaseId,
-      geminiApiKey: geminiKey || undefined,
-      triggerEmoji: emoji || undefined
-    });
-    logger.info(`Config saved for channel ${channelId} in workspace ${workspaceId}:`, { notionDatabaseId, emoji });
   });
 };

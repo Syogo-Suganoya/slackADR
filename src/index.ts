@@ -17,12 +17,13 @@ const receiver = new ExpressReceiver({
   clientId: process.env.SLACK_CLIENT_ID,
   clientSecret: process.env.SLACK_CLIENT_SECRET,
   stateSecret: process.env.SLACK_STATE_SECRET,
-  scopes: ['channels:history', 'groups:history', 'chat:write', 'commands', 'reactions:read'],
+  redirectUri: process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, '')}/slack/oauth_redirect` : undefined,
   installationStore,
+  scopes: ['channels:history', 'groups:history', 'chat:write', 'commands', 'reactions:read'],
   installerOptions: {
-    redirectUri: process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, '')}/slack/oauth_redirect` : undefined,
-    stateVerification: true,
-  } as any,
+    stateVerification: false,
+    redirectUriPath: '/slack/oauth_redirect',
+  },
   processBeforeResponse: true,
 });
 
@@ -40,9 +41,6 @@ const app = new App({
   installationStore,
 });
 
-// Register Handlers
-registerSlackHandlers(app);
-
 // Debug: Log all incoming requests
 receiver.app.use((req, res, next) => {
   if (req.path === '/slack/oauth_redirect') {
@@ -51,6 +49,9 @@ receiver.app.use((req, res, next) => {
   console.log(`[DEBUG] ${req.method} ${req.path}`);
   next();
 });
+
+// Register Handlers
+registerSlackHandlers(app);
 
 // Recovery Endpoint (Triggered by GitHub Actions)
 receiver.app.post('/recovery', async (req, res) => {
@@ -73,7 +74,7 @@ receiver.app.post('/recovery', async (req, res) => {
 });
 
 // Notion OAuth Endpoints
-receiver.app.get('/auth/notion', handleNotionAuthStart);
+receiver.app.get('/notion/install', handleNotionAuthStart);
 receiver.app.get('/notion/callback', handleNotionCallback);
 
 // Custom Health Check
