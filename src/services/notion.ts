@@ -1,6 +1,7 @@
 import { Client } from '@notionhq/client';
 import dotenv from 'dotenv';
 import { ADRData } from './ai';
+import { ConfigService } from './config';
 
 dotenv.config();
 
@@ -10,7 +11,7 @@ export class NotionService {
   private dataSourceId: string;
 
   constructor(token?: string, customDatabaseId?: string) {
-    this.notion = new Client({ auth: token || process.env.NOTION_API_KEY });
+    this.notion = new Client({ auth: token || process.env.NOTION_API_KEY || '' });
     this.databaseId = customDatabaseId || process.env.NOTION_DATABASE_ID || '';
     this.dataSourceId = process.env.NOTION_DATASOURCE_ID || '';
     
@@ -231,35 +232,74 @@ export class NotionService {
     }
   }
 
-  public async processReadyLogs(): Promise<void> {
-    if (!this.databaseId) return;
-
+  public async processReadyLogs(configService: ConfigService): Promise<void> {
     try {
-        console.log(` Querying pages with "Ready" tag via dataSource: ${this.dataSourceId}...`);
-        const response = await (this.notion as any).dataSources.query({
-            data_source_id: this.dataSourceId,
-            filter: {
-                property: 'Tags',
-                multi_select: {
-                    contains: 'Ready'
-                }
+        console.log('🔄 Starting recovery process with OAuth tokens...');
+        const channelConfigs = await configService.getAllChannelConfigs();
+        console.log(`Checking ${channelConfigs.length} registered channels/databases.`);
+
+        for (const config of channelConfigs) {
+            const workspaceConfig = await configService.getWorkspaceConfig(config.workspaceId);
+            const token = workspaceConfig?.notionAccessToken;
+
+            if (!token) {
+                console.warn(`Skipping channel ${config.channelId}: No Notion access token found for workspace ${config.workspaceId}`);
+                continue;
             }
-        });
 
-        const readyPages = (response as any).results;
+            const notion = new Client({ auth: token });
+            const databaseId = config.notionDatabaseId;
+            let dataSourceId = config.notionDataSourceId;
 
-        console.log(`Found ${readyPages.length} pages to process.`);
+            try {
+                // If dataSourceId is missing, try to fetch it
+                if (!dataSourceId) {
+                    const db = await notion.databases.retrieve({ database_id: databaseId }) as any;
+                    if (db.data_sources && db.data_sources.length > 0) {
+                        dataSourceId = db.data_sources[0].id;
+                    }
+                }
 
-        for (const page of readyPages) {
-            await this.handleReadyPage(page);
+                if (!dataSourceId) {
+                    console.warn(`Skipping database ${databaseId}: No data source ID found.`);
+                    continue;
+                }
+
+                const response = await (notion as any).dataSources.query({
+                    data_source_id: dataSourceId,
+                    filter: {
+                        property: 'Tags',
+                        multi_select: {
+                            contains: 'Ready'
+                        }
+                    }
+                });
+
+                const readyPages = response.results;
+                if (readyPages.length > 0) {
+                    console.log(`Found ${readyPages.length} ready pages in database ${databaseId} (Workspace: ${config.workspaceId})`);
+                    for (const page of readyPages) {
+                        try {
+                            // Pass the token explicitly to handleReadyPage or create Notion instance with it
+                            await this.handleReadyPage(page, token); 
+                        } catch (e) {
+                            console.error(`Failed to process page ${page.id}:`, e);
+                        }
+                    }
+                }
+
+            } catch (dbError) {
+                console.error(`Error querying database ${databaseId} for workspace ${config.workspaceId}:`, dbError);
+            }
         }
-
     } catch (error) {
         console.error("Error processing ready logs:", error);
     }
   }
 
-  private async handleReadyPage(page: any): Promise<void> {
+  private async handleReadyPage(page: any, token: string): Promise<void> {
+      // Need to use the correct token for operations
+      const notion = new Client({ auth: token });
     try {
         const readyPageUrl = page.url;
         console.log(`Processing Ready page: ${readyPageUrl}`);
@@ -268,7 +308,7 @@ export class NotionService {
         const slackLink = page.properties.SlackLink?.url || '';
         
         // 2. Get the JSON block
-        const blocks = await this.notion.blocks.children.list({ block_id: page.id });
+        const blocks = await notion.blocks.children.list({ block_id: page.id });
         const jsonBlock = blocks.results.find((b: any) => b.type === 'code' && b.code.language === 'json');
 
         if (!jsonBlock) {
@@ -280,11 +320,11 @@ export class NotionService {
         const adrData = JSON.parse(jsonText) as ADRData;
 
         // 3. Create real ADR page
-        const newUrl = await this.createADRPage(adrData, slackLink);
+        const newUrl = await this.createADRPage(adrData, slackLink, undefined, token);
         console.log(`✅ Created ADR Page: ${newUrl}`);
 
         // 4. Archive old page
-        await this.notion.pages.update({
+        await notion.pages.update({
             page_id: page.id,
             archived: true
         });

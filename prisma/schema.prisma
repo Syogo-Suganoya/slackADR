@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,44 +7,44 @@ datasource db {
 }
 
 model ChannelConfig {
-  id               Int      @id @default(autoincrement())
-  workspaceId     String   
-  channelId       String   @unique 
-  notionDatabaseId String
-  notionDataSourceId String? 
-  geminiApiKey     String?
-  triggerEmoji     String   @default("decision")
-  updatedAt        DateTime @updatedAt
+  id                 Int      @id @default(autoincrement())
+  workspaceId        String
+  channelId          String   @unique
+  notionDatabaseId   String
+  geminiApiKey       String?
+  triggerEmoji       String   @default("decision")
+  updatedAt          DateTime @updatedAt
+  notionDataSourceId String?
 
   @@index([workspaceId])
 }
 
 model WorkspaceConfig {
-  workspaceId        String   @id
-  notionAccessToken  String?
-  notionBotId        String?
-  notionOwner        Json?
-  updatedAt          DateTime @updatedAt
+  workspaceId       String   @id
+  notionAccessToken String?
+  notionBotId       String?
+  notionOwner       Json?
+  updatedAt         DateTime @updatedAt
 }
 
 model SlackInstallation {
-  id                Int      @id @default(autoincrement())
-  teamId            String?  @unique
-  enterpriseId      String?
-  userId            String?
-  botToken          String?
-  botId             String?
-  botUserId         String?
-  botScopes         String?
-  userToken         String?
-  userScopes        String?
-  incomingWebhookUrl String?
+  id                       Int      @id @default(autoincrement())
+  teamId                   String?  @unique
+  enterpriseId             String?
+  userId                   String?
+  botToken                 String?
+  botId                    String?
+  botUserId                String?
+  botScopes                String?
+  userToken                String?
+  userScopes               String?
+  incomingWebhookUrl       String?
   incomingWebhookChannelId String?
-  appId             String?
-  tokenType         String?
-  isEnterpriseInstall Boolean @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  appId                    String?
+  tokenType                String?
+  isEnterpriseInstall      Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   @@index([teamId])
 }

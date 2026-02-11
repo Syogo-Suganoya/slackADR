@@ -68,6 +68,23 @@ export class ConfigService {
     }
   }
 
+  public async getAllChannelConfigs(): Promise<ChannelConfig[]> {
+    try {
+      const configs = await this.prisma.channelConfig.findMany();
+      return configs.map(config => ({
+        workspaceId: config.workspaceId,
+        channelId: config.channelId,
+        notionDatabaseId: config.notionDatabaseId,
+        notionDataSourceId: config.notionDataSourceId,
+        geminiApiKey: config.geminiApiKey,
+        triggerEmoji: config.triggerEmoji
+      }));
+    } catch (error) {
+      console.error('Failed to read all channel configs:', error);
+      return [];
+    }
+  }
+
   public async saveChannelConfig(config: ChannelConfig) {
     try {
       // Notion API から Data Source ID を取得

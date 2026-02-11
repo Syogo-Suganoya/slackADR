@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { registerSlackHandlers } from './handlers/slack';
 import { NotionService } from './services/notion';
 import { handleNotionAuthStart, handleNotionCallback } from './routes/notion-auth';
+import { ConfigService } from './services/config';
 
 import { SlackInstallationStore } from './services/slack-installation';
 
@@ -10,6 +11,7 @@ dotenv.config();
 
 const notionService = new NotionService();
 const installationStore = new SlackInstallationStore();
+const configService = new ConfigService();
 
 // Initialize the ExpressReceiver
 const receiver = new ExpressReceiver({
@@ -65,7 +67,7 @@ receiver.app.post('/recovery', async (req, res) => {
 
   console.log('🚀 Recovery trigger received. Processing Ready logs...');
   try {
-    await notionService.processReadyLogs();
+    await notionService.processReadyLogs(configService);
     res.status(200).send('Recovery process completed');
   } catch (error) {
     console.error('Recovery process failed:', error);
