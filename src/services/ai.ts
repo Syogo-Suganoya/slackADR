@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import { NotionService } from './notion';
@@ -47,15 +48,23 @@ Do NOT use Markdown formatting (like **, _, [links], etc.) in any of the JSON st
     }
 
     if (!genAI) {
-      // API Key missing: Save error log to Notion before throwing
-      console.warn('Gemini API Key is missing. Creating Error Log page in Notion...');
+      fs.appendFileSync('debug.log', `[WARN] Gemini API Key is missing. Creating Error Log page in Notion...\n`);
       try {
         this.lastErrorNotionUrl = await this.saveErrorToNotion(prompt, slackLink, overrideConfig?.notionDatabaseId, overrideConfig?.notionAccessToken);
-      } catch (e) {
-        console.error('Failed to create Error Log page:', e);
+        if (this.lastErrorNotionUrl) {
+          fs.appendFileSync('debug.log', `[DEBUG] Notion error log created: ${this.lastErrorNotionUrl}\n`);
+        } else {
+          fs.appendFileSync('debug.log', `[ERROR] Notion error log creation returned null (possibly caught internal error)\n`);
+        }
+      } catch (e: any) {
+        fs.appendFileSync('debug.log', `[ERROR] Failed to create Error Log page: ${e.message || e}\n`);
       }
       
-      throw new Error('Gemini API Key is not configured. An Error Log page has been created in Notion for manual recovery.');
+      if (this.lastErrorNotionUrl) {
+        throw new Error(`AI generation failed, but error log was saved to Notion. You can manually edit it and change tag to "Ready" for recovery:\n${this.lastErrorNotionUrl}`);
+      } else {
+        throw new Error('AI generation failed and Notion error logging also failed. Please check Notion permissions.');
+      }
     }
 
     try {
@@ -102,13 +111,15 @@ Do NOT use Markdown formatting (like **, _, [links], etc.) in any of the JSON st
       const parsed = JSON.parse(content) as ADRData;
       return parsed;
     } catch (error: any) {
-      console.error('Error in AIService.generateADR:', error.message || error);
+      fs.appendFileSync('debug.log', `[ERROR] Error in AIService.generateADR: ${error.message || error}\n`);
       
       // Save full prompt to Notion on error for manual processing
       try {
+        fs.appendFileSync('debug.log', `[DEBUG] Saving error prompt to Notion...\n`);
         this.lastErrorNotionUrl = await this.saveErrorToNotion(prompt, slackLink, overrideConfig?.notionDatabaseId, overrideConfig?.notionAccessToken);
-      } catch (innerErr) {
-        console.error('Failed to save to Notion after AI error:', innerErr);
+        fs.appendFileSync('debug.log', `[DEBUG] Notion error log created after AI error: ${this.lastErrorNotionUrl}\n`);
+      } catch (innerErr: any) {
+        fs.appendFileSync('debug.log', `[ERROR] Failed to save to Notion after AI error: ${innerErr.message || innerErr}\n`);
       }
       
       throw error;

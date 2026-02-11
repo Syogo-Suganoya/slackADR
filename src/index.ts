@@ -1,10 +1,11 @@
-import { App, ExpressReceiver } from '@slack/bolt';
+import { App, ExpressReceiver, LogLevel } from '@slack/bolt';
 import dotenv from 'dotenv';
+import express from 'express';
+import * as fs from 'fs';
 import { registerSlackHandlers } from './handlers/slack';
 import { NotionService } from './services/notion';
 import { handleNotionAuthStart, handleNotionCallback } from './routes/notion-auth';
 import { ConfigService } from './services/config';
-
 import { SlackInstallationStore } from './services/slack-installation';
 
 dotenv.config();
@@ -12,6 +13,20 @@ dotenv.config();
 const notionService = new NotionService();
 const installationStore = new SlackInstallationStore();
 const configService = new ConfigService();
+
+// Initialize Express separately to add middleware before Bolt
+const expressApp = express();
+
+// Simple Access Log
+expressApp.use((req, res, next) => {
+  const startTime = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    const logEntry = `[${new Date().toISOString()}] ${req.method} ${req.path} - Status: ${res.statusCode} (${duration}ms)\n`;
+    fs.appendFileSync('access.log', logEntry);
+  });
+  next();
+});
 
 // Initialize the ExpressReceiver
 const receiver = new ExpressReceiver({
@@ -21,18 +36,14 @@ const receiver = new ExpressReceiver({
   stateSecret: process.env.SLACK_STATE_SECRET,
   redirectUri: process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, '')}/slack/oauth_redirect` : undefined,
   installationStore,
+  app: expressApp,
   scopes: ['channels:history', 'groups:history', 'chat:write', 'commands', 'reactions:read'],
   installerOptions: {
     stateVerification: false,
     redirectUriPath: '/slack/oauth_redirect',
   },
-  processBeforeResponse: true,
+  processBeforeResponse: false,
 });
-
-// Debug environment variables (masked)
-console.log(`[DEBUG] APP_URL: ${process.env.APP_URL}`);
-console.log(`[DEBUG] SLACK_CLIENT_ID: ${process.env.SLACK_CLIENT_ID ? 'set' : 'MISSING'}`);
-console.log(`[DEBUG] SLACK_STATE_SECRET: ${process.env.SLACK_STATE_SECRET ? 'set' : 'MISSING'}`);
 
 // Trust proxy for Render (required for secure cookies)
 receiver.app.set('trust proxy', 1);
@@ -41,15 +52,7 @@ receiver.app.set('trust proxy', 1);
 const app = new App({
   receiver,
   installationStore,
-});
-
-// Debug: Log all incoming requests
-receiver.app.use((req, res, next) => {
-  if (req.path === '/slack/oauth_redirect') {
-    console.log(`[DEBUG] OAuth Callback Params: state=${req.query.state ? 'exists' : 'MISSING'}, code=${req.query.code ? 'exists' : 'MISSING'}`);
-  }
-  console.log(`[DEBUG] ${req.method} ${req.path}`);
-  next();
+  logLevel: LogLevel.DEBUG,
 });
 
 // Register Handlers

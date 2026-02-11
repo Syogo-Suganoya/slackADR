@@ -10,11 +10,13 @@ model ChannelConfig {
   id                 Int      @id @default(autoincrement())
   workspaceId        String
   channelId          String   @unique
-  notionDatabaseId   String
+  notionDatabaseId   String?
   geminiApiKey       String?
   triggerEmoji       String   @default("decision")
   updatedAt          DateTime @updatedAt
   notionDataSourceId String?
+  notionAccessToken  String?
+  notionBotId        String?
 
   @@index([workspaceId])
 }

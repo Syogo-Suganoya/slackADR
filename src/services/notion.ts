@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import { Client } from '@notionhq/client';
 import dotenv from 'dotenv';
 import { ADRData } from './ai';
@@ -202,32 +203,135 @@ export class NotionService {
         }
     ];
 
-    try {
-        const response = await this.notion.pages.create({
-            parent: { database_id: targetDatabaseId },
+    let targetDbId = targetDatabaseId;
+    const findExistingPage = async (client: Client, dbId: string): Promise<string | null> => {
+        try {
+            const response = await (client as any).databases.query({
+                database_id: dbId,
+                filter: {
+                    property: 'SlackLink',
+                    url: {
+                        equals: slackLink
+                    }
+                },
+                page_size: 1
+            });
+            return response.results.length > 0 ? response.results[0].id : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const updatePage = async (client: Client, pageId: string) => {
+        // Update properties
+        await client.pages.update({
+            page_id: pageId,
             properties: {
                 Name: {
-                    title: [
-                        {
-                            text: {
-                                content: `Error Log: ${timestamp}`,
-                            },
-                        },
-                    ],
+                    title: [{ text: { content: `Error Log: ${timestamp}` } }],
                 },
                 Tags: {
                     multi_select: [{ name: 'Pending' }],
-                },
-                "SlackLink": {
-                    url: slackLink || null
                 }
-            } as any,
-            children: children,
+            } as any
+        });
+
+        // Delete old blocks
+        const existingBlocks = await client.blocks.children.list({ block_id: pageId });
+        for (const block of existingBlocks.results) {
+            await client.blocks.delete({ block_id: block.id });
+        }
+
+        // Append new blocks
+        await client.blocks.children.append({
+            block_id: pageId,
+            children: children
         });
         
-        return (response as any).url;
-    } catch(error) {
-        console.error("Failed to create Notion error log page:", error);
+        return (await client.pages.retrieve({ page_id: pageId }) as any).url;
+    };
+
+    const tryCreateOrUpdate = async (client: Client, dbId: string, isFallback: boolean = false): Promise<string | null> => {
+        try {
+            const existingPageId = await findExistingPage(client, dbId);
+            if (existingPageId) {
+                fs.appendFileSync('debug.log', `[DEBUG] Found existing error log page: ${existingPageId}. Updating...\n`);
+                return await updatePage(client, existingPageId);
+            } else {
+                const response = await client.pages.create({
+                    parent: { database_id: dbId },
+                    properties: {
+                        Name: {
+                            title: [{ text: { content: `Error Log${isFallback ? ' (Fallback)' : ''}: ${timestamp}` } }],
+                        },
+                        Tags: {
+                            multi_select: [{ name: 'Pending' }],
+                        },
+                        "SlackLink": {
+                            url: slackLink || null
+                        }
+                    } as any,
+                    children: children,
+                });
+                return (response as any).url;
+            }
+        } catch (e: any) {
+            fs.appendFileSync('debug.log', `[ERROR] Failed in tryCreateOrUpdate for DB (${dbId}): ${e.message || e}\n`);
+            return null;
+        }
+    };
+
+    try {
+        fs.appendFileSync('debug.log', `[DEBUG] Attempting to create or update Notion error log page in DB: ${targetDbId}\n`);
+        
+        let url = await tryCreateOrUpdate(this.notion, targetDbId);
+        
+        // If initial attempt failed, try to find ANY database accessible with THIS token
+        if (!url && overrideToken) {
+            fs.appendFileSync('debug.log', `[DEBUG] Target DB failed. Searching for any other accessible database with user token...\n`);
+            const bestDbId = await this.findBestDatabase(overrideToken);
+            if (bestDbId && bestDbId !== targetDbId) {
+                fs.appendFileSync('debug.log', `[DEBUG] Found alternative database: ${bestDbId}. Retrying...\n`);
+                url = await tryCreateOrUpdate(this.notion, bestDbId);
+            }
+        }
+
+        if (url) {
+            fs.appendFileSync('debug.log', `[DEBUG] Notion error log page processed successfully: ${url}\n`);
+            return url;
+        }
+        
+        throw new Error(`Failed to create page in target or alternative databases.`);
+    } catch(error: any) {
+        // Final Fallback to internal credentials
+        if (overrideDatabaseId || overrideToken) {
+            fs.appendFileSync('debug.log', `[DEBUG] Retrying with default internal credentials (fallback)...\n`);
+            try {
+                const internalToken = process.env.NOTION_API_KEY || '';
+                const internalDbId = process.env.NOTION_DATABASE_ID || '';
+                if (!internalDbId || !internalToken) throw new Error('Internal Notion credentials are not configured.');
+
+                const internalClient = new Client({ auth: internalToken });
+                let fallbackUrl = await tryCreateOrUpdate(internalClient, internalDbId);
+
+                // If internal specific DB failed, try ANY DB accessible with internal token
+                if (!fallbackUrl) {
+                    fs.appendFileSync('debug.log', `[DEBUG] Internal primary DB failed. Searching for any internal accessible database...\n`);
+                    const bestInternalDbId = await this.findBestDatabase(internalToken);
+                    if (bestInternalDbId && bestInternalDbId !== internalDbId) {
+                        fallbackUrl = await tryCreateOrUpdate(internalClient, bestInternalDbId);
+                    }
+                }
+
+                if (fallbackUrl) {
+                    fs.appendFileSync('debug.log', `[DEBUG] Fallback process successful: ${fallbackUrl}\n`);
+                    return fallbackUrl;
+                }
+            } catch (fallbackError: any) {
+                fs.appendFileSync('debug.log', `[ERROR] Internal fallback process also failed: ${fallbackError.message || fallbackError}\n`);
+            }
+        }
+        
         throw error;
     }
   }
@@ -240,7 +344,7 @@ export class NotionService {
 
         for (const config of channelConfigs) {
             const workspaceConfig = await configService.getWorkspaceConfig(config.workspaceId);
-            const token = workspaceConfig?.notionAccessToken;
+            const token = config.notionAccessToken || workspaceConfig?.notionAccessToken;
 
             if (!token) {
                 console.warn(`Skipping channel ${config.channelId}: No Notion access token found for workspace ${config.workspaceId}`);
@@ -253,7 +357,7 @@ export class NotionService {
 
             try {
                 // If dataSourceId is missing, try to fetch it
-                if (!dataSourceId) {
+                if (!dataSourceId && databaseId) {
                     const db = await notion.databases.retrieve({ database_id: databaseId }) as any;
                     if (db.data_sources && db.data_sources.length > 0) {
                         dataSourceId = db.data_sources[0].id;

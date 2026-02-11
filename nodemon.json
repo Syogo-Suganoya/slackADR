@@ -1,0 +1,14 @@
+{
+  "ignore": [
+    "debug.log",
+    "access.log",
+    "*.log",
+    ".git",
+    "node_modules",
+    "dist"
+  ],
+  "watch": [
+    "src"
+  ],
+  "ext": "ts,json"
+}

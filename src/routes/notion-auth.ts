@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import { Request, Response } from 'express';
 import { NotionService } from '../services/notion';
 import { ConfigService } from '../services/config';
@@ -32,9 +33,10 @@ export const handleNotionCallback = async (req: Request, res: Response) => {
 
   try {
     const decodedState = JSON.parse(Buffer.from(state as string, 'base64').toString());
-    const { workspaceId } = decodedState;
+    const { workspaceId, channelId } = decodedState;
 
-    console.log(`[Notion OAuth] Exchanging code for token for workspace: ${workspaceId}`);
+    fs.appendFileSync('debug.log', `[Notion OAuth] Callback received. workspaceId: ${workspaceId}, channelId: ${channelId}\n`);
+    console.log(`[Notion OAuth] Exchanging code for token for workspace: ${workspaceId}, channel: ${channelId}`);
     
     // Exchange code for token
     const tokenData = await notionService.exchangeAuthCode(code as string);
@@ -42,7 +44,23 @@ export const handleNotionCallback = async (req: Request, res: Response) => {
     const botId = tokenData.bot_id;
     const owner = tokenData.owner;
     
-    // Save to database
+    // Save to channel config (Priority)
+    if (channelId) {
+      const existingConfig = await configService.getChannelConfig(channelId);
+      await configService.saveChannelConfig({
+        workspaceId: workspaceId,
+        channelId: channelId,
+        notionDatabaseId: existingConfig?.notionDatabaseId ?? null,
+        notionAccessToken: accessToken,
+        notionBotId: botId,
+        geminiApiKey: existingConfig?.geminiApiKey ?? null,
+        triggerEmoji: existingConfig?.triggerEmoji ?? 'decision'
+      });
+      fs.appendFileSync('debug.log', `[Notion OAuth] Token saved for channel: ${channelId}\n`);
+      console.log(`[Notion OAuth] Token saved for channel: ${channelId}`);
+    }
+
+    // Save to workspace config (Legacy/Global fallback)
     await configService.saveWorkspaceConfig({
       workspaceId: workspaceId,
       notionAccessToken: accessToken,
@@ -50,6 +68,7 @@ export const handleNotionCallback = async (req: Request, res: Response) => {
       notionOwner: owner
     });
 
+    fs.appendFileSync('debug.log', `[Notion OAuth] Token saved for workspace: ${workspaceId}\n`);
     console.log(`[Notion OAuth] Token saved for workspace: ${workspaceId}`);
 
     // Render success page

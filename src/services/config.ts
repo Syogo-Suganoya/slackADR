@@ -9,10 +9,12 @@ dotenv.config();
 export interface ChannelConfig {
   workspaceId: string;
   channelId: string;
-  notionDatabaseId: string;
+  notionDatabaseId?: string | null;
   notionDataSourceId?: string | null;
   geminiApiKey?: string | null;
   triggerEmoji?: string;
+  notionAccessToken?: string | null;
+  notionBotId?: string | null;
 }
 
 export interface WorkspaceConfig {
@@ -43,7 +45,9 @@ export class ConfigService {
         notionDatabaseId: config.notionDatabaseId,
         notionDataSourceId: config.notionDataSourceId,
         geminiApiKey: config.geminiApiKey,
-        triggerEmoji: config.triggerEmoji
+        triggerEmoji: config.triggerEmoji,
+        notionAccessToken: config.notionAccessToken,
+        notionBotId: config.notionBotId
       } : null;
     } catch (error) {
       console.error('Failed to read config from database:', error);
@@ -77,7 +81,9 @@ export class ConfigService {
         notionDatabaseId: config.notionDatabaseId,
         notionDataSourceId: config.notionDataSourceId,
         geminiApiKey: config.geminiApiKey,
-        triggerEmoji: config.triggerEmoji
+        triggerEmoji: config.triggerEmoji,
+        notionAccessToken: config.notionAccessToken,
+        notionBotId: config.notionBotId
       }));
     } catch (error) {
       console.error('Failed to read all channel configs:', error);
@@ -103,19 +109,23 @@ export class ConfigService {
         where: { channelId: config.channelId },
         update: {
           workspaceId: config.workspaceId,
-          notionDatabaseId: config.notionDatabaseId,
+          notionDatabaseId: config.notionDatabaseId ?? null,
           notionDataSourceId: dataSourceId,
-          geminiApiKey: config.geminiApiKey || null,
-          triggerEmoji: config.triggerEmoji || 'decision'
-        },
+          geminiApiKey: config.geminiApiKey ?? null,
+          triggerEmoji: config.triggerEmoji || 'decision',
+          notionAccessToken: config.notionAccessToken ?? null,
+          notionBotId: config.notionBotId ?? null
+        } as any,
         create: {
           workspaceId: config.workspaceId,
           channelId: config.channelId,
-          notionDatabaseId: config.notionDatabaseId,
+          notionDatabaseId: config.notionDatabaseId ?? null,
           notionDataSourceId: dataSourceId,
-          geminiApiKey: config.geminiApiKey || null,
-          triggerEmoji: config.triggerEmoji || 'decision'
-        }
+          geminiApiKey: config.geminiApiKey ?? null,
+          triggerEmoji: config.triggerEmoji || 'decision',
+          notionAccessToken: config.notionAccessToken ?? null,
+          notionBotId: config.notionBotId ?? null
+        } as any
       });
     } catch (error) {
       console.error('Failed to save config to database:', error);
