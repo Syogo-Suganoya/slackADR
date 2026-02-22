@@ -13,8 +13,8 @@
     "node": ">=18.0.0"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Syogo-Suganoya",
+  "license": "MIT",
   "description": "",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
