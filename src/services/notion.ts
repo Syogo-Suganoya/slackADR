@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import { Client } from '@notionhq/client';
 import dotenv from 'dotenv';
 import { ADRData } from './ai';
@@ -255,7 +254,6 @@ export class NotionService {
         try {
             const existingPageId = await findExistingPage(client, dbId);
             if (existingPageId) {
-                fs.appendFileSync('debug.log', `[DEBUG] Found existing error log page: ${existingPageId}. Updating...\n`);
                 return await updatePage(client, existingPageId);
             } else {
                 const response = await client.pages.create({
@@ -276,28 +274,22 @@ export class NotionService {
                 return (response as any).url;
             }
         } catch (e: any) {
-            fs.appendFileSync('debug.log', `[ERROR] Failed in tryCreateOrUpdate for DB (${dbId}): ${e.message || e}\n`);
             return null;
         }
     };
 
     try {
-        fs.appendFileSync('debug.log', `[DEBUG] Attempting to create or update Notion error log page in DB: ${targetDbId}\n`);
-        
         let url = await tryCreateOrUpdate(this.notion, targetDbId);
         
         // If initial attempt failed, try to find ANY database accessible with THIS token
         if (!url && overrideToken) {
-            fs.appendFileSync('debug.log', `[DEBUG] Target DB failed. Searching for any other accessible database with user token...\n`);
             const bestDbId = await this.findBestDatabase(overrideToken);
             if (bestDbId && bestDbId !== targetDbId) {
-                fs.appendFileSync('debug.log', `[DEBUG] Found alternative database: ${bestDbId}. Retrying...\n`);
                 url = await tryCreateOrUpdate(this.notion, bestDbId);
             }
         }
 
         if (url) {
-            fs.appendFileSync('debug.log', `[DEBUG] Notion error log page processed successfully: ${url}\n`);
             return url;
         }
         
@@ -305,7 +297,6 @@ export class NotionService {
     } catch(error: any) {
         // Final Fallback to internal credentials
         if (overrideDatabaseId || overrideToken) {
-            fs.appendFileSync('debug.log', `[DEBUG] Retrying with default internal credentials (fallback)...\n`);
             try {
                 const internalToken = process.env.NOTION_API_KEY || '';
                 const internalDbId = process.env.NOTION_DATABASE_ID || '';
@@ -316,7 +307,6 @@ export class NotionService {
 
                 // If internal specific DB failed, try ANY DB accessible with internal token
                 if (!fallbackUrl) {
-                    fs.appendFileSync('debug.log', `[DEBUG] Internal primary DB failed. Searching for any internal accessible database...\n`);
                     const bestInternalDbId = await this.findBestDatabase(internalToken);
                     if (bestInternalDbId && bestInternalDbId !== internalDbId) {
                         fallbackUrl = await tryCreateOrUpdate(internalClient, bestInternalDbId);
@@ -324,11 +314,10 @@ export class NotionService {
                 }
 
                 if (fallbackUrl) {
-                    fs.appendFileSync('debug.log', `[DEBUG] Fallback process successful: ${fallbackUrl}\n`);
                     return fallbackUrl;
                 }
             } catch (fallbackError: any) {
-                fs.appendFileSync('debug.log', `[ERROR] Internal fallback process also failed: ${fallbackError.message || fallbackError}\n`);
+                // Ignore fallback error
             }
         }
         

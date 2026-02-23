@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import { NotionService } from './notion';
@@ -48,16 +47,10 @@ Do NOT use Markdown formatting (like **, _, [links], etc.) in any of the JSON st
     }
 
     if (!genAI) {
-      fs.appendFileSync('debug.log', `[WARN] Gemini API Key is missing. Creating Error Log page in Notion...\n`);
       try {
         this.lastErrorNotionUrl = await this.saveErrorToNotion(prompt, slackLink, overrideConfig?.notionDatabaseId, overrideConfig?.notionAccessToken);
-        if (this.lastErrorNotionUrl) {
-          fs.appendFileSync('debug.log', `[DEBUG] Notion error log created: ${this.lastErrorNotionUrl}\n`);
-        } else {
-          fs.appendFileSync('debug.log', `[ERROR] Notion error log creation returned null (possibly caught internal error)\n`);
-        }
       } catch (e: any) {
-        fs.appendFileSync('debug.log', `[ERROR] Failed to create Error Log page: ${e.message || e}\n`);
+        // Ignore or handle error logging error
       }
       
       if (this.lastErrorNotionUrl) {
@@ -111,15 +104,11 @@ Do NOT use Markdown formatting (like **, _, [links], etc.) in any of the JSON st
       const parsed = JSON.parse(content) as ADRData;
       return parsed;
     } catch (error: any) {
-      fs.appendFileSync('debug.log', `[ERROR] Error in AIService.generateADR: ${error.message || error}\n`);
-      
       // Save full prompt to Notion on error for manual processing
       try {
-        fs.appendFileSync('debug.log', `[DEBUG] Saving error prompt to Notion...\n`);
         this.lastErrorNotionUrl = await this.saveErrorToNotion(prompt, slackLink, overrideConfig?.notionDatabaseId, overrideConfig?.notionAccessToken);
-        fs.appendFileSync('debug.log', `[DEBUG] Notion error log created after AI error: ${this.lastErrorNotionUrl}\n`);
       } catch (innerErr: any) {
-        fs.appendFileSync('debug.log', `[ERROR] Failed to save to Notion after AI error: ${innerErr.message || innerErr}\n`);
+        // Ignore inner error
       }
       
       throw error;

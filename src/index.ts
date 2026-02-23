@@ -1,7 +1,6 @@
 import { App, ExpressReceiver, LogLevel } from '@slack/bolt';
 import dotenv from 'dotenv';
 import express from 'express';
-import * as fs from 'fs';
 import { registerSlackHandlers } from './handlers/slack';
 import { NotionService } from './services/notion';
 import { handleNotionAuthStart, handleNotionCallback } from './routes/notion-auth';
@@ -17,17 +16,6 @@ const configService = new ConfigService();
 // Initialize Express separately to add middleware before Bolt
 const expressApp = express();
 
-// Simple Access Log
-expressApp.use((req, res, next) => {
-  const startTime = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - startTime;
-    const logEntry = `[${new Date().toISOString()}] ${req.method} ${req.path} - Status: ${res.statusCode} (${duration}ms)\n`;
-    fs.appendFileSync('access.log', logEntry);
-  });
-  next();
-});
-
 // Initialize the ExpressReceiver
 const receiver = new ExpressReceiver({
   signingSecret: process.env.SLACK_SIGNING_SECRET || '',
@@ -37,7 +25,7 @@ const receiver = new ExpressReceiver({
   redirectUri: process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, '')}/slack/oauth_redirect` : undefined,
   installationStore,
   app: expressApp,
-  scopes: ['channels:history', 'groups:history', 'chat:write', 'commands', 'reactions:read'],
+  scopes: ['channels:history', 'groups:history', 'chat:write', 'commands', 'reactions:read', 'channels:read', 'groups:read'],
   installerOptions: {
     stateVerification: false,
     redirectUriPath: '/slack/oauth_redirect',
@@ -80,7 +68,7 @@ receiver.app.post('/recovery', async (req, res) => {
 
 // Notion OAuth Endpoints
 receiver.app.get('/notion/install', handleNotionAuthStart);
-receiver.app.get('/notion/callback', handleNotionCallback);
+receiver.app.get('/notion/callback', handleNotionCallback(installationStore));
 
 // Custom Health Check
 receiver.app.get('/', (req, res) => {

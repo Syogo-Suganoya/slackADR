@@ -1,26 +1,27 @@
-import * as fs from 'fs';
 import { Request, Response } from 'express';
 import { NotionService } from '../services/notion';
 import { ConfigService } from '../services/config';
+import { WebClient } from '@slack/web-api';
+import { buildConfigBlocks } from '../services/slack-ui';
 
 const notionService = new NotionService();
 const configService = new ConfigService();
 
 export const handleNotionAuthStart = async (req: Request, res: Response) => {
-  const { workspaceId, channelId, userId } = req.query;
+  const { workspaceId, channelId, userId, externalId } = req.query;
 
   if (!workspaceId || !channelId || !userId) {
     return res.status(400).send('Missing required parameters: workspaceId, channelId, userId');
   }
 
   // Encode state
-  const state = JSON.stringify({ workspaceId, channelId, userId });
+  const state = JSON.stringify({ workspaceId, channelId, userId, externalId });
   const authUrl = notionService.getAuthorizationUrl(Buffer.from(state).toString('base64'));
 
   res.redirect(authUrl);
 };
 
-export const handleNotionCallback = async (req: Request, res: Response) => {
+export const handleNotionCallback = (installationStore: any) => async (req: Request, res: Response) => {
   const { code, state, error } = req.query;
 
   if (error) {
@@ -35,7 +36,6 @@ export const handleNotionCallback = async (req: Request, res: Response) => {
     const decodedState = JSON.parse(Buffer.from(state as string, 'base64').toString());
     const { workspaceId, channelId } = decodedState;
 
-    fs.appendFileSync('debug.log', `[Notion OAuth] Callback received. workspaceId: ${workspaceId}, channelId: ${channelId}\n`);
     console.log(`[Notion OAuth] Exchanging code for token for workspace: ${workspaceId}, channel: ${channelId}`);
     
     // Exchange code for token
@@ -56,7 +56,6 @@ export const handleNotionCallback = async (req: Request, res: Response) => {
         geminiApiKey: existingConfig?.geminiApiKey ?? null,
         triggerEmoji: existingConfig?.triggerEmoji ?? 'decision'
       });
-      fs.appendFileSync('debug.log', `[Notion OAuth] Token saved for channel: ${channelId}\n`);
       console.log(`[Notion OAuth] Token saved for channel: ${channelId}`);
     }
 
@@ -68,8 +67,43 @@ export const handleNotionCallback = async (req: Request, res: Response) => {
       notionOwner: owner
     });
 
-    fs.appendFileSync('debug.log', `[Notion OAuth] Token saved for workspace: ${workspaceId}\n`);
     console.log(`[Notion OAuth] Token saved for workspace: ${workspaceId}`);
+
+    // Automatically update Slack modal if externalId is present
+    const { userId, externalId } = decodedState;
+    if (externalId && installationStore) {
+      try {
+        const installData = await installationStore.fetchInstallation({ teamId: workspaceId });
+        if (installData && installData.bot?.token) {
+          const client = new WebClient(installData.bot.token);
+          const channelConfig = await configService.getChannelConfig(channelId);
+          
+          const blocks = buildConfigBlocks(
+            true, // isConnected is now true
+            channelConfig,
+            { team_id: workspaceId, channel_id: channelId, user_id: userId },
+            process.env.APP_URL || '',
+            externalId
+          );
+
+          await client.views.update({
+            external_id: externalId,
+            view: {
+              type: 'modal',
+              callback_id: 'adr_config_modal',
+              external_id: externalId,
+              private_metadata: JSON.stringify({ channel_id: channelId }),
+              title: { type: 'plain_text', text: 'ADR Bot Config' },
+              blocks: blocks,
+              submit: { type: 'plain_text', text: 'Save' },
+              close: { type: 'plain_text', text: 'Cancel' }
+            }
+          });
+        }
+      } catch (slackErr) {
+        console.error('[Notion OAuth] Slack modal update error:', slackErr);
+      }
+    }
 
     // Render success page
     res.send(`

@@ -93,39 +93,45 @@ export class ConfigService {
 
   public async saveChannelConfig(config: ChannelConfig) {
     try {
-      // Notion API から Data Source ID を取得
+      // 既存の設定を取得（トークンなどを保持するため）
+      const existing = await this.prisma.channelConfig.findUnique({
+        where: { channelId: config.channelId }
+      });
+
+      // Notion API から Data Source ID を取得するためのトークン
+      // 引数にあるか、既存のものがあるか、最悪ワークスペースのものを使う
+      let token = config.notionAccessToken || existing?.notionAccessToken;
+      if (!token) {
+          const workspaceConfig = await this.getWorkspaceConfig(config.workspaceId);
+          token = workspaceConfig?.notionAccessToken || process.env.NOTION_API_KEY || null;
+      }
+
       let dataSourceId = config.notionDataSourceId;
-      if (!dataSourceId && config.notionDatabaseId) {
-        // トークンが必要なため、WorkspaceConfig も取得する
-        const workspaceConfig = await this.getWorkspaceConfig(config.workspaceId);
-        const token = workspaceConfig?.notionAccessToken || process.env.NOTION_API_KEY;
-        
-        if (token) {
-           dataSourceId = await this.fetchDataSourceId(config.notionDatabaseId, token);
-        }
+      if (!dataSourceId && config.notionDatabaseId && token) {
+        dataSourceId = await this.fetchDataSourceId(config.notionDatabaseId, token);
       }
 
       await this.prisma.channelConfig.upsert({
         where: { channelId: config.channelId },
         update: {
           workspaceId: config.workspaceId,
-          notionDatabaseId: config.notionDatabaseId ?? null,
-          notionDataSourceId: dataSourceId,
-          geminiApiKey: config.geminiApiKey ?? null,
-          triggerEmoji: config.triggerEmoji || 'decision',
-          notionAccessToken: config.notionAccessToken ?? null,
-          notionBotId: config.notionBotId ?? null
-        } as any,
+          notionDatabaseId: config.notionDatabaseId !== undefined ? config.notionDatabaseId : existing?.notionDatabaseId,
+          notionDataSourceId: dataSourceId || existing?.notionDataSourceId,
+          geminiApiKey: config.geminiApiKey !== undefined ? config.geminiApiKey : existing?.geminiApiKey,
+          triggerEmoji: config.triggerEmoji || existing?.triggerEmoji || 'decision',
+          notionAccessToken: config.notionAccessToken || existing?.notionAccessToken,
+          notionBotId: config.notionBotId || existing?.notionBotId
+        },
         create: {
           workspaceId: config.workspaceId,
           channelId: config.channelId,
           notionDatabaseId: config.notionDatabaseId ?? null,
-          notionDataSourceId: dataSourceId,
+          notionDataSourceId: dataSourceId ?? null,
           geminiApiKey: config.geminiApiKey ?? null,
           triggerEmoji: config.triggerEmoji || 'decision',
           notionAccessToken: config.notionAccessToken ?? null,
           notionBotId: config.notionBotId ?? null
-        } as any
+        }
       });
     } catch (error) {
       console.error('Failed to save config to database:', error);
