@@ -1,13 +1,13 @@
-import { App, ExpressReceiver, LogLevel } from '@slack/bolt';
 import dotenv from 'dotenv';
+dotenv.config();
+
+import { App, ExpressReceiver, LogLevel } from '@slack/bolt';
 import express from 'express';
 import { registerSlackHandlers } from './handlers/slack';
 import { NotionService } from './services/notion';
 import { handleNotionAuthStart, handleNotionCallback } from './routes/notion-auth';
 import { ConfigService } from './services/config';
 import { SlackInstallationStore } from './services/slack-installation';
-
-dotenv.config();
 
 const notionService = new NotionService();
 const installationStore = new SlackInstallationStore();
@@ -80,4 +80,5 @@ const PORT = process.env.PORT || 3000;
 (async () => {
   await app.start(parseInt(String(PORT), 10));
   console.log(`⚡️ Slack ADR Bot is running on port ${PORT}!`);
+  console.log(`🚀 Registered command: /adr-config${process.env.SLACK_COMMAND_SUFFIX || ''}`);
 })();

@@ -8,6 +8,7 @@ import { buildConfigBlocks } from '../services/slack-ui';
 const aiService = new AIService();
 const notionService = new NotionService();
 const configService = new ConfigService();
+const CONFIG_COMMAND = `/adr-config${process.env.SLACK_COMMAND_SUFFIX || ''}`;
 
 export const registerSlackHandlers = (app: App) => {
   app.event('reaction_added', async ({ event, client, logger, body }) => {
@@ -29,7 +30,7 @@ export const registerSlackHandlers = (app: App) => {
       await client.chat.postMessage({
         channel: event.item.channel,
         thread_ts: event.item.ts,
-        text: ':warning: Notion 連携が完了していません。`/adr-config` から Notion と連携してください。'
+        text: `:warning: Notion 連携が完了していません。\`${CONFIG_COMMAND}\` から Notion と連携してください。`
       });
       return;
     }
@@ -38,7 +39,7 @@ export const registerSlackHandlers = (app: App) => {
       await client.chat.postMessage({
         channel: event.item.channel,
         thread_ts: event.item.ts,
-        text: ':warning: Notion データベースが設定されていません。`/adr-config` から設定を行ってください。'
+        text: `:warning: Notion データベースが設定されていません。\`${CONFIG_COMMAND}\` から設定を行ってください。`
       });
       return;
     }
@@ -127,7 +128,7 @@ export const registerSlackHandlers = (app: App) => {
     }
   });
 
-  app.command('/adr-config', async ({ ack, body, client, logger }) => {
+  app.command(CONFIG_COMMAND as any, async ({ ack, body, client, logger }) => {
     await ack();
 
     // Perform heavy lifting in an async block without awaiting to avoid Slack timeout
