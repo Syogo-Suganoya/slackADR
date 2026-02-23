@@ -58,7 +58,7 @@ receiver.app.post('/recovery', async (req, res) => {
 
   console.log('🚀 Recovery trigger received. Processing Ready logs...');
   try {
-    await notionService.processReadyLogs(configService);
+    await notionService.processReadyLogs(configService, installationStore);
     res.status(200).send('Recovery process completed');
   } catch (error) {
     console.error('Recovery process failed:', error);

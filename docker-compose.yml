@@ -1,15 +1,15 @@
 services:
   db:
-    image: postgres:15-alpine
+    image: mysql:8.0
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: slackadr
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: slackadr
+    command: --default-authentication-plugin=mysql_native_password
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
 
 volumes:
-  postgres_data:
+  mysql_data:

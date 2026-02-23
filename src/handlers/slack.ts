@@ -114,7 +114,7 @@ export const registerSlackHandlers = (app: App) => {
       await client.chat.postMessage({
         channel: channelId,
         thread_ts: messageTs,
-        text: `✅ Notion 記事を作成しました！\n${notionPage}`
+        text: `✅ I've created a Notion article!\n${notionPage}`
       });
 
     } catch (error: any) {
@@ -148,6 +148,12 @@ export const registerSlackHandlers = (app: App) => {
           const errorCode = error.data?.error || error.message;
           if (errorCode === 'missing_scope') {
             isScopeError = true;
+          } else if (errorCode === 'not_in_channel') {
+            isMember = false;
+          } else {
+            // Log other errors and continue with isMember = false
+            logger.error('Unexpected error in conversations.info:', error);
+            isMember = false;
           }
         }
         

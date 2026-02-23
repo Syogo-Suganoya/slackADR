@@ -1,4 +1,5 @@
 import { Client } from '@notionhq/client';
+import { WebClient } from '@slack/web-api';
 import dotenv from 'dotenv';
 import { ADRData } from './ai';
 import { ConfigService } from './config';
@@ -325,7 +326,7 @@ export class NotionService {
     }
   }
 
-  public async processReadyLogs(configService: ConfigService): Promise<void> {
+  public async processReadyLogs(configService: ConfigService, installationStore?: any): Promise<void> {
     try {
         console.log('🔄 Starting recovery process with OAuth tokens...');
         const channelConfigs = await configService.getAllChannelConfigs();
@@ -369,12 +370,12 @@ export class NotionService {
                 });
 
                 const readyPages = response.results;
-                if (readyPages.length > 0) {
+                if (readyPages.length > 0 && databaseId) {
                     console.log(`Found ${readyPages.length} ready pages in database ${databaseId} (Workspace: ${config.workspaceId})`);
                     for (const page of readyPages) {
                         try {
-                            // Pass the token explicitly to handleReadyPage or create Notion instance with it
-                            await this.handleReadyPage(page, token); 
+                            // Pass the token and databaseId explicitly
+                            await this.handleReadyPage(page, token, databaseId, installationStore, config.workspaceId); 
                         } catch (e) {
                             console.error(`Failed to process page ${page.id}:`, e);
                         }
@@ -390,7 +391,7 @@ export class NotionService {
     }
   }
 
-  private async handleReadyPage(page: any, token: string): Promise<void> {
+  private async handleReadyPage(page: any, token: string, databaseId: string, installationStore?: any, workspaceId?: string): Promise<void> {
       // Need to use the correct token for operations
       const notion = new Client({ auth: token });
     try {
@@ -413,10 +414,50 @@ export class NotionService {
         const adrData = JSON.parse(jsonText) as ADRData;
 
         // 3. Create real ADR page
-        const newUrl = await this.createADRPage(adrData, slackLink, undefined, token);
+        const newUrl = await this.createADRPage(adrData, slackLink, databaseId, token);
         console.log(`✅ Created ADR Page: ${newUrl}`);
 
-        // 4. Archive old page
+        // 4. Notify Slack if installationStore and workspaceId are provided
+        if (installationStore && workspaceId && slackLink) {
+            try {
+                // Satisfy the InstallationQuery type explicitly
+                const installation = await installationStore.fetchInstallation({ 
+                    teamId: workspaceId,
+                    enterpriseId: undefined,
+                    userId: undefined,
+                    isEnterpriseInstall: false
+                });
+                const botToken = installation.bot?.token;
+
+                if (botToken) {
+                    const slackClient = new WebClient(botToken);
+                    
+                    // Extract channel and ts from link
+                    // URL format: https://slack.com/archives/C12345/p1234567890123456
+                    const parts = slackLink.split('/');
+                    if (parts.length >= 2) {
+                        const channelId = parts[parts.length - 2];
+                        const pTs = parts[parts.length - 1];
+                        
+                        if (channelId && pTs.startsWith('p')) {
+                            const tsRaw = pTs.substring(1);
+                            const ts = tsRaw.substring(0, 10) + '.' + tsRaw.substring(10);
+
+                            await slackClient.chat.postMessage({
+                                channel: channelId,
+                                thread_ts: ts,
+                                text: `✅ 【Recovery】 I've created a Notion article!\n${newUrl}`
+                            });
+                            console.log(`📢 Slack notification sent to ${channelId} (${ts})`);
+                        }
+                    }
+                }
+            } catch (slackError) {
+                console.error('Failed to send Slack notification:', slackError);
+            }
+        }
+
+        // 5. Archive old page
         await notion.pages.update({
             page_id: page.id,
             archived: true
