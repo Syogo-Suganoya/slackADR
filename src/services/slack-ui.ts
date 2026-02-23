@@ -13,11 +13,11 @@ export const buildConfigBlocks = (
     return [
       {
         type: 'section',
-        text: { type: 'mrkdwn', text: '👋 こんにちは！ADR Bot を利用するには、まず Notion との連携が必要です。' }
+        text: { type: 'mrkdwn', text: "👋 Hi! To use ADR Bot, you first need to connect with Notion." }
       },
       {
         type: 'section',
-        text: { type: 'mrkdwn', text: '以下のボタンをクリックして、Notion のワークスペースへのアクセスを許可してください（OAuth 認証）。' }
+        text: { type: 'mrkdwn', text: 'Please click the button below to authorize access to your Notion workspace (OAuth).' }
       },
       {
         type: 'actions',
@@ -35,7 +35,7 @@ export const buildConfigBlocks = (
     return [
       {
         type: 'section',
-        text: { type: 'mrkdwn', text: `✅ *Notion 連携済み*\nADR 生成のためのチャンネル設定を行います。\n\n> 💡 *別のデータベースを使いたい場合や、アクセスできない場合は*\n> <${installUrl}|こちらをクリックして Notion の権限を追加してください>。` }
+        text: { type: 'mrkdwn', text: `✅ *Notion Connected*\nConfigure the channel settings for ADR generation.\n\n> 💡 *If you want to use a different database or can't access it*\n> <${installUrl}|Click here to add Notion permissions>.` }
       },
       {
         type: 'divider'
@@ -50,7 +50,7 @@ export const buildConfigBlocks = (
           placeholder: { type: 'plain_text', text: 'https://www.notion.so/...' },
           initial_value: config?.notionDatabaseId ? `https://www.notion.so/${config.notionDatabaseId.replace(/-/g, '')}` : ''
         },
-        hint: { type: 'plain_text', text: '連携したい Notion データベースの URL を入力してください。' }
+        hint: { type: 'plain_text', text: 'Enter the URL of the Notion database you want to link.' }
       },
       {
         type: 'input',
@@ -63,7 +63,7 @@ export const buildConfigBlocks = (
           placeholder: { type: 'plain_text', text: 'AIZA...' },
           initial_value: config?.geminiApiKey || ''
         },
-        hint: { type: 'plain_text', text: '個別の API キーを使用する場合は入力してください。' }
+        hint: { type: 'plain_text', text: 'Enter your individual API key if you wish to use one.' }
       },
       {
         type: 'input',
@@ -75,7 +75,7 @@ export const buildConfigBlocks = (
           placeholder: { type: 'plain_text', text: 'decision' },
           initial_value: config?.triggerEmoji || 'decision'
         },
-        hint: { type: 'plain_text', text: 'ADR 生成のトリガーとなる絵文字名を入力してください（例: decision）。コロンは不要です。' }
+        hint: { type: 'plain_text', text: 'Enter the emoji name that triggers ADR generation (e.g., decision). No colons needed.' }
       }
     ];
   }
