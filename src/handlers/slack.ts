@@ -197,7 +197,7 @@ export const registerSlackHandlers = (app: App) => {
             callback_id: 'adr_config_modal',
             external_id: externalId,
             private_metadata: JSON.stringify({ channel_id: body.channel_id }),
-            title: { type: 'plain_text', text: 'ADR Bot Config' },
+            title: { type: 'plain_text', text: 'slackADR Config' },
             blocks: blocks,
             submit: isConnected ? { type: 'plain_text', text: 'Save' } : undefined,
             close: { type: 'plain_text', text: 'Cancel' }

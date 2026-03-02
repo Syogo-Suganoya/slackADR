@@ -13,7 +13,7 @@ export const buildConfigBlocks = (
     return [
       {
         type: 'section',
-        text: { type: 'mrkdwn', text: "👋 Hi! To use ADR Bot, you first need to connect with Notion." }
+        text: { type: 'mrkdwn', text: "👋 Hi! To use slackADR, you first need to connect with Notion." }
       },
       {
         type: 'section',

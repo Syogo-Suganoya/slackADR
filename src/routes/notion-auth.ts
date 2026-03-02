@@ -93,7 +93,7 @@ export const handleNotionCallback = (installationStore: any) => async (req: Requ
               callback_id: 'adr_config_modal',
               external_id: externalId,
               private_metadata: JSON.stringify({ channel_id: channelId }),
-              title: { type: 'plain_text', text: 'ADR Bot Config' },
+              title: { type: 'plain_text', text: 'slackADR Config' },
               blocks: blocks,
               submit: { type: 'plain_text', text: 'Save' },
               close: { type: 'plain_text', text: 'Cancel' }
