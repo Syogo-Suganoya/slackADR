@@ -16,6 +16,10 @@ Uses AI (Gemini) to summarize discussions and store them in a database.
 ## 🏗️ Architecture
 For operating principles and detailed diagrams, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
+## ⚠️ Notes
+- **Data Retention**: Slack conversation content is NOT stored in any database. It is processed temporarily in memory and used ONLY for ADR generation (summarization).
+- **Privacy**: Please be careful not to include personal or sensitive information in the content sent to the AI.
+
 ## 📖 Usage
 ### 0. Prepare Notion Database
 Create a Notion database to store ADRs.
