@@ -16,7 +16,7 @@ graph TD
         Handler[Slack Event Handler]
         AI[AI Service]
         Notion[Notion Service]
-        DB[(PostgreSQL)]
+        DB[(MySQL)]
     end
     
     Handler -- "Check config" --> DB
@@ -97,8 +97,8 @@ sequenceDiagram
     B->>N: "pages.create (Create error log)"
     B->>S: "chat.postMessage (Error notification & Log URL)"
     U->>N: "Manually paste JSON & Change Tag to \"Ready\""
-    Note over B: Batch process every 5 minutes (GitHub Actions)
-    B->>N: "dataSources.query (Detect \"Ready\")"
+    Note over B: Batch process (GitHub Actions)
+    B->>N: "databases.query (Detect \"Ready\")"
     N-->>B: Page details
     B->>N: "pages.create (Create ADR & Archive old page)"
     B->>S: chat.postMessage (Success notification)
@@ -133,7 +133,11 @@ erDiagram
         String workspaceId FK
         String channelId UK
         String notionDatabaseId
+        String geminiApiKey
         String triggerEmoji
+        String notionDataSourceId
+        String notionAccessToken
+        String notionBotId
         DateTime updatedAt
     }
 ```

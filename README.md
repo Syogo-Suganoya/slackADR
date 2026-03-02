@@ -17,73 +17,35 @@ Uses AI (Gemini) to summarize discussions and store them in a database.
 For operating principles and detailed diagrams, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## 📖 Usage
-
-```mermaid
-graph TD
-    %% Setup Phase
-    subgraph Setup ["<font color='#01579B'>0. Initial Setup (Once only)</font>"]
-        A[Create Notion DB & Set Properties] --> B[Add Notion Connection]
-        B --> C[Invite Slack App to Channel]
-        C --> D["/adr-config to connect DB"]
-    end
-
-    %% Usage Phase
-    subgraph Usage ["<font color='#2E7D32'>1. Normal ADR Creation Flow</font>"]
-        E[Discuss in Slack Thread] --> F["Add :decision: reaction to parent"]
-        F --> G{AI Analysis Success?}
-        G -- Yes --> H[Auto-generate ADR in Notion]
-        H --> I[Slack Notification]
-    end
-
-    %% Recovery Phase
-    subgraph Recovery ["<font color='#F57F17'>2. Error Recovery</font>"]
-        G -- No --> J[Create Error Log in Notion]
-        J --> K[Slack Error Notification]
-        K --> L[Manually Input Prompt to External AI]
-        L --> M[Paste JSON Response to Notion]
-        M --> N["Change Tags to 'Ready'"]
-        N --> O[Batch Process Detects Every 5 Mins]
-        O --> H
-    end
-
-    %% Style Definitions
-    style Setup fill:#E1F5FE,stroke:#01579B,stroke-width:2px
-    style Usage fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px
-    style Recovery fill:#FFFDE7,stroke:#FBC02D,stroke-width:2px
-```
-
 ### 0. Prepare Notion Database
-![alt text](image/readme/emp.jpg)
-
 Create a Notion database to store ADRs.
 
-1. **Create a new page**: Select "Table - Inline" in Notion.
-2. **Add required properties**: (Case-sensitive)
-   - `Name` (Title) - Exists by default.
-   - `Tags` (Multi-select) - Used for recovery (`Ready` tag).
-   - `SlackLink` (URL) - Link to the Slack thread.
-3. **Add Connection**: Click "..." at top right -> "Connections" -> "Connect to" and add the ADR integration.
-4. **Copy Database URL**: Copy the URL from the browser address bar (used in `/adr-config`).
+1. **Open Template**: Access the [Notion ADR Template](https://believed-eris-e1c.notion.site/3100e2401e48803bb1a4fa1a7a572efb?v=3100e2401e48807d9e17000c9ead4e63&pvs=74)
+2. **Duplicate**: Click the "Duplicate" button at the top right to copy it to your workspace.
+3. **Copy Database URL**: Copy the URL from your browser's address bar (used later in `/adr-config`).
 
 ### 1. Add Slack App to Workspace
-![alt text](image/readme/invite.jpg)
-1. Create and configure the app in the Slack API Dashboard.
-2. Install to your workspace.
-3. Invite the app to the channel ( `/invite @app_name` ).
+1. Click the button below to install the app to your workspace.
+    <a href="https://slack.com/oauth/v2/authorize?client_id=1206114197232.10586356955696&scope=channels:history,channels:read,chat:write,commands,groups:history,groups:read,reactions:read&user_scope="><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a>
+2. Invite the app to the channel where you want to create ADRs ( `/invite @slackADR` ).
 
 ### 2. Channel-specific Configuration
-![alt text](image/readme/adr_command.jpg)
-![alt text](image/readme/model.jpg)
+Link each channel with a specific Notion database.
 
-Run `/adr-config` in the channel and enter:
-- **Notion Database URL**: The URL where ADRs will be saved.
-- **Gemini API Key** (Optional): If you want to use a channel-specific API key.
-- **Trigger Emoji**: The emoji that triggers ADR creation (Default: `decision`).
-
-Settings are saved to PostgreSQL.
+1. **Run Command**: Type `/adr-config` in the channel.
+2. **Notion Connection**: 
+   - Click "Connect to Notion 🔗" to open the authorization page.
+   - Select the page containing your database (from Step 0) and grant access.
+   - Close the browser tab once successful.
+3. **Enter Settings**:
+   - **Notion Database URL**: Enter the database URL copied in Step 0.
+   - **Gemini API Key** (Optional): Enter a specific API key if you have one.
+     - If left blank, manual recovery will be required. See "5. AI Error Recovery Procedure".
+   - **Trigger Emoji**: Enter the emoji to trigger ADR creation (Default: `decision`).
+4. **Save**: Click "Save" to complete.
 
 ### 3. Add Emoji (if needed)
-If the **Trigger Emoji** does not exist, add it as a custom emoji to your Slack workspace.
+If the **Trigger Emoji** does not exist in your workspace, add it as a custom emoji.
 
 ### 4. Create ADR
 
@@ -92,7 +54,7 @@ If the **Trigger Emoji** does not exist, add it as a custom emoji to your Slack 
 | <img src="image/readme/thread.jpg" width="600"> | <img src="image/readme/create.jpg" width="600"> |
 
 1. Discuss in a Slack thread.
-2. Add the **Trigger Emoji** as a reaction to the parent message of the thread.
+2. Add the **Trigger Emoji** reaction to the parent message of the thread.
 3. The bot automatically analyzes the thread and creates an ADR in Notion.
 4. A link to the Notion page will be posted to Slack upon completion.
 

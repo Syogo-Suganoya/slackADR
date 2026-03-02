@@ -17,70 +17,32 @@ AI (Gemini) を使用して議論を要約し、データベース化します�
 システムの動作原理や詳細な構成図については、[ARCHITECTURE.md](./ARCHITECTURE.md) を参照してください。
 
 ## 📖 使い方
-
-```mermaid
-graph TD
-    %% 初期設定フェーズ
-    subgraph Setup ["<font color='#01579B'>0. 初期設定 (初回のみ)</font>"]
-        A[Notion DB作成 & プロパティ設定] --> B[Notionコネクト追加]
-        B --> C[Slackアプリをチャンネルに招待]
-        C --> D["/adr-config でDB接続設定"]
-    end
-
-    %% 通常運用フェーズ
-    subgraph Usage ["<font color='#2E7D32'>1. 通常のADR作成フロー</font>"]
-        E[Slackスレッドで議論] --> F["親メッセージに :decision: リアクション"]
-        F --> G{AI解析成功?}
-        G -- Yes --> H[NotionにADRを自動生成]
-        H --> I[Slackに完了通知]
-    end
-
-    %% リカバリーフェーズ
-    subgraph Recovery ["<font color='#F57F17'>2. エラー時のリカバリー</font>"]
-        G -- No --> J[Notionにエラーログを作成]
-        J --> K[Slackにエラー通知]
-        K --> L[外部AIにプロンプトを手動入力]
-        L --> M[JSONレスポンスをNotionに貼り付け]
-        M --> N["Tagsを 'Ready' に変更"]
-        N --> O[5分おきのバッチ処理が自動検知]
-        O --> H
-    end
-
-    %% スタイル定義
-    style Setup fill:#E1F5FE,stroke:#01579B,stroke-width:2px
-    style Usage fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px
-    style Recovery fill:#FFFDE7,stroke:#FBC02D,stroke-width:2px
-```
-
 ### 0. Notion データベースの準備
-![alt text](image/readme/emp.jpg)
-
 ADR を保存するための Notion データベースを作成します。
 
-1. **新しいページを作成**: Notion で新しいページを作成し、「テーブル - インライン」を選択
-2. **必須プロパティの追加**: 以下のプロパティが必要です（大文字・小文字を正確に入力してください）
-   - `Name` (タイトル) - デフォルトで存在
-   - `Tags` (マルチセレクト) - リカバリー機能で使用（`Ready` タグを追加）
-   - `SlackLink` (URL) - Slack スレッドへのリンク
-3. **コネクトの追加**: ページ右上の「︙」→「コネクト」→「新しいコネクト」を選択し、ADR データベースを追加
-4. **データベース URL をコピー**: ブラウザのアドレスバーから URL をコピー（後で `/adr-config` で使用）
+1. **テンプレートを開く**: [Notion ADR テンプレート](https://believed-eris-e1c.notion.site/3100e2401e48803bb1a4fa1a7a572efb?v=3100e2401e48807d9e17000c9ead4e63&pvs=74) にアクセス
+2. **複製 (Duplicate)**: 画面右上の「複製」ボタンをクリックして、自分のワークスペースにコピー
+3. **データベース URL をコピー**: ブラウザのアドレスバーから URL をコピー（後で `/adr-config` で使用）
 
 ### 1. Slack アプリをワークスペースに追加
-![alt text](image/readme/invite.jpg)
-1. Slack API ダッシュボードでアプリを作成・設定
-2. ワークスペースにインストール
-3. ADR を作成したいチャンネルにアプリを招待（`/invite @アプリ名`）
+1. 下記をクリックして、ワークスペースにアプリをインストール
+    <a href="https://slack.com/oauth/v2/authorize?client_id=1206114197232.10586356955696&scope=channels:history,channels:read,chat:write,commands,groups:history,groups:read,reactions:read&user_scope="><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a>
+2. ADR を作成したいチャンネルにアプリを招待（`/invite @slackADR`）
 
 ### 2. チャンネルごとの設定
-![alt text](image/readme/adr_command.jpg)
-![alt text](image/readme/model.jpg)
+ADR を作成したい各チャンネルで、Notion データベースとの紐付けを行います。
 
-チャンネルで `/adr-config` を実行し、モーダルに以下を入力：
-- **Notion Database URL**: ADR を保存する Notion データベースの URL
-- **Gemini API Key** (オプション): チャンネル専用の API キーを使う場合
-- **Trigger Emoji**: ADR 作成のトリガーとなる絵文字（デフォルト: `decision`）
-
-「保存」をクリックすると、設定が PostgreSQL に保存されます。
+1. **コマンドの実行**: チャンネルで `/adr-config` を入力して実行
+2. **Notion 連携**: 
+   - 「Connect to Notion 🔗」ボタンをクリックし、ブラウザで連携ページを開く
+   - 連携したいページ（手順 0 で作成したデータベースを含むページ）を選択し、アクセスを許可
+   - 成功画面が表示されたらタブを閉じて Slack に戻る
+3. **設定の入力**:
+   - **Notion Database URL**: 手順 0 でコピーしたデータベースの URL を入力
+   - **Gemini API Key** (オプション): ADR作成に使用するGeminiAPIキーを設定
+     - 未設定の場合、手動でのリカバリーが必要になります。詳細は「5. AI エラー時のリカバリー手順」を参照してください。
+   - **Trigger Emoji**: ADR 作成のトリガーとなる絵文字を入力（デフォルト: `decision`）
+4. **保存**: 「Save」ボタンをクリックして完了
 
 ### 3. 絵文字の追加（必要に応じて）
 **Trigger Emoji**の絵文字がない場合は、Slack ワークスペースにカスタム絵文字を追加してください。
@@ -90,7 +52,6 @@ ADR を保存するための Notion データベースを作成します。
 |  |  |
 | - | - |
 | <img src="image/readme/thread.jpg" width="600"> | <img src="image/readme/create.jpg" width="600"> |
-
 
 1. Slack のスレッドで議論を行う
 2. スレッドの親メッセージに設定した**Trigger Emoji**をリアクションとして追加
