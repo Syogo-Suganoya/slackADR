@@ -50,7 +50,7 @@ This section guides you through submitting an enhancement suggestion, including 
 
 4. **Start Infrastructure**:
    ```sh
-   docker-compose up -d
+   docker compose up -d
    ```
 
 5. **Prisma Migrations**:
