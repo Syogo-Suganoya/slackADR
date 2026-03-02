@@ -433,11 +433,9 @@ export class NotionService {
                     const slackClient = new WebClient(botToken);
                     
                             // Extract channel and ts from link
-                            // URL format: https://slack.com/archives/C12345/p1234567890123456
                             console.log(`🔗 Parsing Slack link: ${slackLink}`);
                             const parts = slackLink.split('/');
                             if (parts.length >= 2) {
-                                // 最後のスラッシュの有無に対応
                                 const lastPart = parts[parts.length - 1] === '' ? parts[parts.length - 2] : parts[parts.length - 1];
                                 const channelPart = parts[parts.length - 1] === '' ? parts[parts.length - 3] : parts[parts.length - 2];
                                 
@@ -446,7 +444,24 @@ export class NotionService {
                                     const ts = tsRaw.substring(0, 10) + '.' + tsRaw.substring(10);
                                     const channelId = channelPart;
 
-                                    console.log(`📡 Attempting to send Slack notification: channel=${channelId}, ts=${ts}, workspace=${workspaceId}`);
+                                    console.log(`📡 Attempting Slack notification: channel=${channelId}, ts=${ts}, workspace=${workspaceId}`);
+
+                                    // 診断情報の取得
+                                    try {
+                                        const auth = await slackClient.auth.test();
+                                        console.log(`🤖 Bot Identity: user=${auth.user}, userId=${auth.user_id}, team=${auth.team}, teamId=${auth.team_id}`);
+
+                                        // チャンネル情報の取得
+                                        const info = await slackClient.conversations.info({ channel: channelId });
+                                        console.log(`📍 Channel Info: name=${info.channel?.name}, is_member=${info.channel?.is_member}, is_private=${info.channel?.is_private}`);
+
+                                        if (!info.channel?.is_member && !info.channel?.is_private) {
+                                            console.log(`🤝 Bot is not in public channel ${channelId}. Attempting to join...`);
+                                            await slackClient.conversations.join({ channel: channelId });
+                                        }
+                                    } catch (diagError: any) {
+                                        console.warn(`⚠️ Could not fetch diagnostic info: ${diagError.message}`);
+                                    }
 
                                     await slackClient.chat.postMessage({
                                         channel: channelId,
@@ -455,7 +470,7 @@ export class NotionService {
                                     });
                                     console.log(`📢 Slack notification sent to ${channelId} (${ts})`);
                                 } else {
-                                    console.warn(`⚠️ Could not parse channel or ts from link: ${slackLink} (channelPart: ${channelPart}, lastPart: ${lastPart})`);
+                                    console.warn(`⚠️ Could not parse channel or ts: ${slackLink}`);
                                 }
                             }
                 }
