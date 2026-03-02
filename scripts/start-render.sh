@@ -28,10 +28,26 @@ EOF
 # 2. SSH トンネルの起動 (バックグラウンド)
 # -L 3307:[DBホスト]:3306
 echo "Starting SSH tunnel to XServer MySQL..."
-ssh -f -N -L 3307:${DB_HOST_REMOTE:-mysql10025.xserver.jp}:3306 xserver-tunnel
+# -v を追加して詳細ログを出し、エラーを stderr に出力
+ssh -f -N -v -L 3307:${DB_HOST_REMOTE:-mysql10025.xserver.jp}:3306 xserver-tunnel 2>&1 | tee /tmp/ssh_tunnel.log &
 
-# トンネルが起動するまで少し待機
-sleep 3
+# トンネルが起動するまで最大30秒チェック
+echo "Waiting for SSH tunnel to be established on port 3307..."
+MAX_RETRIES=30
+COUNT=0
+while ! timeout 1 bash -c "true > /dev/tcp/127.0.0.1/3307" 2>/dev/null; do
+  sleep 2
+  COUNT=$((COUNT + 1))
+  echo "Still waiting... ($COUNT/$MAX_RETRIES)"
+  if [ $COUNT -ge $MAX_RETRIES ]; then
+    echo "Error: SSH tunnel could not be established after $((MAX_RETRIES * 2)) seconds."
+    echo "--- SSH Logs ---"
+    [ -f /tmp/ssh_tunnel.log ] && cat /tmp/ssh_tunnel.log
+    exit 1
+  fi
+done
+
+echo "✅ SSH tunnel is up and running!"
 
 # 3. アプリケーションの起動
 echo "Starting application..."
