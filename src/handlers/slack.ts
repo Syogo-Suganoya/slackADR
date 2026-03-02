@@ -77,7 +77,10 @@ export const registerSlackHandlers = (app: App) => {
       }
 
       // Filter: Exclude bot messages and Notion creation notifications
-      const botUserId = (await client.auth.test()).user_id;
+      const auth = await client.auth.test();
+      const botUserId = auth.user_id;
+      const teamUrl = auth.url || 'https://slack.com/'; // e.g. "https://my-team.slack.com/"
+      
       const filteredMessages = replies.messages.filter(msg => {
         // Exclude messages from THIS bot
         if (msg.user === botUserId) return false;
@@ -98,7 +101,7 @@ export const registerSlackHandlers = (app: App) => {
 
       // 4. Generate ADR with AI
       const threadText = filteredMessages.map(m => `<@${m.user}>: ${m.text}`).join('\n');
-      const slackLink = `https://slack.com/archives/${channelId}/p${messageTs.replace('.', '')}`;
+      const slackLink = `${teamUrl.replace(/\/$/, '')}/archives/${channelId}/p${messageTs.replace('.', '')}`;
       const adrData = await aiService.generateADR(threadText, slackLink, {
         geminiApiKey: config?.geminiApiKey || undefined,
         notionDatabaseId: config?.notionDatabaseId || undefined,

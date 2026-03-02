@@ -432,25 +432,32 @@ export class NotionService {
                 if (botToken) {
                     const slackClient = new WebClient(botToken);
                     
-                    // Extract channel and ts from link
-                    // URL format: https://slack.com/archives/C12345/p1234567890123456
-                    const parts = slackLink.split('/');
-                    if (parts.length >= 2) {
-                        const channelId = parts[parts.length - 2];
-                        const pTs = parts[parts.length - 1];
-                        
-                        if (channelId && pTs.startsWith('p')) {
-                            const tsRaw = pTs.substring(1);
-                            const ts = tsRaw.substring(0, 10) + '.' + tsRaw.substring(10);
+                            // Extract channel and ts from link
+                            // URL format: https://slack.com/archives/C12345/p1234567890123456
+                            console.log(`🔗 Parsing Slack link: ${slackLink}`);
+                            const parts = slackLink.split('/');
+                            if (parts.length >= 2) {
+                                // 最後のスラッシュの有無に対応
+                                const lastPart = parts[parts.length - 1] === '' ? parts[parts.length - 2] : parts[parts.length - 1];
+                                const channelPart = parts[parts.length - 1] === '' ? parts[parts.length - 3] : parts[parts.length - 2];
+                                
+                                if (channelPart && lastPart.startsWith('p')) {
+                                    const tsRaw = lastPart.substring(1);
+                                    const ts = tsRaw.substring(0, 10) + '.' + tsRaw.substring(10);
+                                    const channelId = channelPart;
 
-                            await slackClient.chat.postMessage({
-                                channel: channelId,
-                                thread_ts: ts,
-                                text: `✅ 【Recovery】 I've created a Notion article!\n${newUrl}`
-                            });
-                            console.log(`📢 Slack notification sent to ${channelId} (${ts})`);
-                        }
-                    }
+                                    console.log(`📡 Attempting to send Slack notification: channel=${channelId}, ts=${ts}, workspace=${workspaceId}`);
+
+                                    await slackClient.chat.postMessage({
+                                        channel: channelId,
+                                        thread_ts: ts,
+                                        text: `✅ 【Recovery】 I've created a Notion article!\n${newUrl}`
+                                    });
+                                    console.log(`📢 Slack notification sent to ${channelId} (${ts})`);
+                                } else {
+                                    console.warn(`⚠️ Could not parse channel or ts from link: ${slackLink} (channelPart: ${channelPart}, lastPart: ${lastPart})`);
+                                }
+                            }
                 }
             } catch (slackError) {
                 console.error('Failed to send Slack notification:', slackError);
