@@ -25,8 +25,7 @@ Create a Notion database to store ADRs.
 3. **Copy Database URL**: Copy the URL from your browser's address bar (used later in `/adr-config`).
 
 ### 1. Add Slack App to Workspace
-1. Click the button below to install the app to your workspace.
-    <a href="https://slack.com/oauth/v2/authorize?client_id=1206114197232.10586356955696&scope=channels:history,channels:read,chat:write,commands,groups:history,groups:read,reactions:read&user_scope="><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a>
+1. <a href="https://slack.com/oauth/v2/authorize?client_id=1206114197232.10364910926373&scope=groups:read,channels:history,channels:read,chat:write,commands,groups:history,reactions:read&user_scope="><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a> Click to install the app in your workspace.
 2. Invite the app to the channel where you want to create ADRs ( `/invite @slackADR` ).
 
 ### 2. Channel-specific Configuration

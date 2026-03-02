@@ -25,8 +25,7 @@ ADR を保存するための Notion データベースを作成します。
 3. **データベース URL をコピー**: ブラウザのアドレスバーから URL をコピー（後で `/adr-config` で使用）
 
 ### 1. Slack アプリをワークスペースに追加
-1. 下記をクリックして、ワークスペースにアプリをインストール
-    <a href="https://slack.com/oauth/v2/authorize?client_id=1206114197232.10586356955696&scope=channels:history,channels:read,chat:write,commands,groups:history,groups:read,reactions:read&user_scope="><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a>
+1. <a href="https://slack.com/oauth/v2/authorize?client_id=1206114197232.10364910926373&scope=groups:read,channels:history,channels:read,chat:write,commands,groups:history,reactions:read&user_scope="><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a> をクリックして、ワークスペースにアプリをインストール
 2. ADR を作成したいチャンネルにアプリを招待（`/invite @slackADR`）
 
 ### 2. チャンネルごとの設定
