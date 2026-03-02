@@ -33,14 +33,15 @@ Link each channel with a specific Notion database.
 
 1. **Run Command**: Type `/adr-config` in the channel.
 2. **Notion Connection**: 
-   - Click "Connect to Notion 🔗" to open the authorization page.
-   - Select the page containing your database (from Step 0) and grant access.
-   - Close the browser tab once successful.
+    - Click "Connect to Notion 🔗" to open the authorization page.
+    - Select the page containing your database (from Step 0) and grant access.
+        - At this time, we recommend not unchecking the items that are already checked. They may be used in other channels.
+    - Close the browser tab once successful.
 3. **Enter Settings**:
-   - **Notion Database URL**: Enter the database URL copied in Step 0.
-   - **Gemini API Key** (Optional): Enter a specific API key if you have one.
-     - If left blank, manual recovery will be required. See "5. AI Error Recovery Procedure".
-   - **Trigger Emoji**: Enter the emoji to trigger ADR creation (Default: `decision`).
+    - **Notion Database URL**: Enter the database URL copied in Step 0.
+    - **Gemini API Key** (Optional): Enter a specific API key if you have one.
+        - If left blank, manual recovery will be required. See "5. AI Error Recovery Procedure".
+    - **Trigger Emoji**: Enter the emoji to trigger ADR creation (Default: `decision`).
 4. **Save**: Click "Save" to complete.
 
 ### 3. Add Emoji (if needed)
@@ -62,11 +63,11 @@ If the AI API quota is exceeded or an error occurs:
 
 1. **Check Error Log**: A link to the Notion error log page will be posted to Slack.
 2. **Manually Send Prompt**:
-   - Copy the prompt from the error log page.
-   - Send the prompt to an AI like Gemini or ChatGPT.
-   - Get the response in JSON format.
+    - Copy the prompt from the error log page.
+    - Send the prompt to an AI like Gemini or ChatGPT.
+    - Get the response in JSON format.
 3. **Input Result into Notion**:
-   - Paste the AI-generated JSON into the **JSON Summary Input** in the error log page.
-   - Change the `Tags` property to `Ready`.
+    - Paste the AI-generated JSON into the **JSON Summary Input** in the error log page.
+    - Change the `Tags` property to `Ready`.
 4. **Auto-Recovery**: A batch process runs every 5 minutes, detects pages with the `Ready` tag, and creates the ADR.
 5. **Completion**: Notification will be sent to Slack once created.
