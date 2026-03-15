@@ -13,6 +13,9 @@ AI (Gemini) を使用して議論を要約し、データベース化します�
 - **自動リカバリー**: AI 解析に失敗した場合も Notion にログを残し、後から一括リカバリー可能
 - **チャンネルごとの設定**: `/adr-config` で Notion データベースを個別に設定可能
 
+## デモ動画
+<iframe width="560" height="315" src="https://www.youtube.com/embed/xcHaS9UBwDU?si=sK97Wd6D3xN3qKvy" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 ## 🏗️ アーキテクチャ
 システムの動作原理や詳細な構成図については、[ARCHITECTURE.md](./ARCHITECTURE.md) を参照してください。
 

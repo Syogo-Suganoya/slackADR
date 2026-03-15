@@ -13,6 +13,9 @@ Uses AI (Gemini) to summarize discussions and store them in a database.
 - **Auto-Recovery**: Even if AI analysis fails, logs are kept in Notion for batch recovery later.
 - **Channel-specific Settings**: Configure Notion databases individually for each channel via `/adr-config`.
 
+## Demo
+<iframe width="560" height="315" src="https://www.youtube.com/embed/xcHaS9UBwDU?si=sK97Wd6D3xN3qKvy" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 ## 🏗️ Architecture
 For operating principles and detailed diagrams, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
