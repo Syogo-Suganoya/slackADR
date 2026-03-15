@@ -8,7 +8,8 @@
     "start:render": "bash scripts/start-render.sh",
     "start:recovery": "node dist/recovery_only.js",
     "dev": "nodemon src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "prisma generate"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -50,3 +50,14 @@ model SlackInstallation {
 
   @@index([teamId])
 }
+
+model SystemLog {
+  id        Int      @id @default(autoincrement())
+  level     String
+  message   String   @db.Text
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([level])
+  @@index([createdAt])
+}

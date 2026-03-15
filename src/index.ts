@@ -8,6 +8,7 @@ import { NotionService } from './services/notion';
 import { handleNotionAuthStart, handleNotionCallback } from './routes/notion-auth';
 import { ConfigService } from './services/config';
 import { SlackInstallationStore } from './services/slack-installation';
+import { logger } from './services/logger';
 
 const notionService = new NotionService();
 const installationStore = new SlackInstallationStore();
@@ -52,16 +53,16 @@ receiver.app.post('/recovery', async (req, res) => {
   const expectedToken = process.env.RECOVERY_TOKEN;
 
   if (!expectedToken || token !== expectedToken) {
-    console.warn('Unauthorized recovery attempt');
+    logger.warn('Unauthorized recovery attempt');
     return res.status(401).send('Unauthorized');
   }
 
-  console.log('🚀 Recovery trigger received. Processing Ready logs...');
+  logger.info('🚀 Recovery trigger received. Processing Ready logs...');
   try {
     await notionService.processReadyLogs(configService, installationStore);
     res.status(200).send('Recovery process completed');
   } catch (error) {
-    console.error('Recovery process failed:', error);
+    logger.error('Recovery process failed:', error);
     res.status(500).send('Recovery process failed');
   }
 });
@@ -79,6 +80,6 @@ const PORT = process.env.PORT || 3000;
 
 (async () => {
   await app.start(parseInt(String(PORT), 10));
-  console.log(`⚡️ Slack ADR Bot is running on port ${PORT}!`);
-  console.log(`🚀 Registered command: /adr-config${process.env.SLACK_COMMAND_SUFFIX || ''}`);
+  logger.info(`⚡️ Slack ADR Bot is running on port ${PORT}!`);
+  logger.info(`🚀 Registered command: /adr-config${process.env.SLACK_COMMAND_SUFFIX || ''}`);
 })();

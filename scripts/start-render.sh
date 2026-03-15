@@ -28,8 +28,8 @@ EOF
 # 2. SSH トンネルの起動 (バックグラウンド)
 # -L 3307:[DBホスト]:3306
 echo "Starting SSH tunnel to XServer MySQL..."
-# -v を追加して詳細ログを出し、エラーを stderr に出力
-ssh -f -N -v -L 3307:${DB_HOST_REMOTE:-mysql10025.xserver.jp}:3306 xserver-tunnel 2>&1 | tee /tmp/ssh_tunnel.log &
+# -v を削除して不要なデバッグログを抑制
+ssh -f -N -L 3307:${DB_HOST_REMOTE:-mysql10025.xserver.jp}:3306 xserver-tunnel 2>&1 | tee /tmp/ssh_tunnel.log &
 
 # トンネルが起動するまで最大30秒チェック
 echo "Waiting for SSH tunnel to be established on port 3307..."
