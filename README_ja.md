@@ -14,7 +14,7 @@ AI (Gemini) を使用して議論を要約し、データベース化します�
 - **チャンネルごとの設定**: `/adr-config` で Notion データベースを個別に設定可能
 
 ## デモ動画
-<iframe width="560" height="315" src="https://www.youtube.com/embed/xcHaS9UBwDU?si=sK97Wd6D3xN3qKvy" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+[![デモ動画](https://img.youtube.com/vi/xcHaS9UBwDU/0.jpg)](https://www.youtube.com/watch?v=xcHaS9UBwDU)
 
 ## 🏗️ アーキテクチャ
 システムの動作原理や詳細な構成図については、[ARCHITECTURE.md](./ARCHITECTURE.md) を参照してください。
