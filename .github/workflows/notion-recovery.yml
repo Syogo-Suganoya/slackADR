@@ -2,8 +2,8 @@ name: Notion ADR Recovery
 
 on:
   schedule:
-    # 5分ごとに実行 (UTC)
-    - cron: '*/5 * * * *'
+    # 4時間ごとに実行 (UTC)
+    - cron: '0 */4 * * *'
   workflow_dispatch: # 手動実行も可能にする
 
 jobs:
