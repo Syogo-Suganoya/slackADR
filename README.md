@@ -20,8 +20,21 @@ Uses AI (Gemini) to summarize discussions and store them in a database.
 For operating principles and detailed diagrams, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## ⚠️ Notes
-- **Data Retention**: Slack conversation content is NOT stored in any database. It is processed temporarily in memory and used ONLY for ADR generation (summarization).
-- **Privacy**: Please be careful not to include personal or sensitive information in the content sent to the AI.
+
+### 🔒 Privacy and Data
+
+* **Data Storage**: The content of Slack conversations is not stored in a database. It is processed temporarily in memory and used solely to generate summaries for ADR.
+* **Handling of Confidential Information**: Your input is sent to the AI model. Please take great care to ensure it does not contain any personal or confidential information.
+
+### 🚀 Server Specifications
+
+This app is deployed using the **Render** free plan. As a result, the following limitations apply:
+
+* **Sleep Function**: If there is no activity for 15 minutes, the server will automatically enter a sleep state (spin down).
+* **Initial startup delay**: It takes **between 30 seconds and 1 minute** to resume from sleep mode.
+* **What to do if you encounter a connection error**:
+* If the page does not display, please wait for about a minute and then reload it.
+* If the error screen persists, please try **clearing your browser cache** or accessing the site in an **incognito window**.
 
 ## 📖 Usage
 ### 0. Prepare Notion Database
