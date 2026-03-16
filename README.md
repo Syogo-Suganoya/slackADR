@@ -89,5 +89,5 @@ If the AI API quota is exceeded or an error occurs:
 3. **Input Result into Notion**:
     - Paste the AI-generated JSON into the **JSON Summary Input** in the error log page.
     - Change the `Tags` property to `Ready`.
-4. **Auto-Recovery**: A batch process runs every 5 minutes, detects pages with the `Ready` tag, and creates the ADR.
+4. **Auto-Recovery**: A batch process runs every 4 hours, detects pages with the `Ready` tag, and creates the ADR.
 5. **Completion**: Notification will be sent to Slack once created.
