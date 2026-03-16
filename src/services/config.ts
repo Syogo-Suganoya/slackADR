@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { Client as NotionClient } from '@notionhq/client';
 import dotenv from 'dotenv';
+import { logger } from './logger';
 
 dotenv.config();
 
@@ -47,7 +48,7 @@ export class ConfigService {
         notionBotId: config.notionBotId
       } : null;
     } catch (error) {
-      console.error('Failed to read config from database:', error);
+      logger.error('Failed to read config from database:', error);
       return null;
     }
   }
@@ -64,7 +65,7 @@ export class ConfigService {
         notionOwner: config.notionOwner
       } : null;
     } catch (error) {
-      console.error('Failed to read workspace config from database:', error);
+      logger.error('Failed to read workspace config from database:', error);
       return null;
     }
   }
@@ -83,7 +84,7 @@ export class ConfigService {
         notionBotId: config.notionBotId
       }));
     } catch (error) {
-      console.error('Failed to read all channel configs:', error);
+      logger.error('Failed to read all channel configs:', error);
       return [];
     }
   }
@@ -131,7 +132,7 @@ export class ConfigService {
         }
       });
     } catch (error) {
-      console.error('Failed to save config to database:', error);
+      logger.error('Failed to save config to database:', error);
     }
   }
 
@@ -152,7 +153,7 @@ export class ConfigService {
         }
       });
     } catch (error) {
-      console.error('Failed to save workspace config to database:', error);
+      logger.error('Failed to save workspace config to database:', error);
     }
   }
 
@@ -172,7 +173,7 @@ export class ConfigService {
       
       return null;
     } catch (error) {
-      console.error('Failed to fetch data source ID from Notion:', error);
+      logger.error('Failed to fetch data source ID from Notion:', error);
       return null;
     }
   }

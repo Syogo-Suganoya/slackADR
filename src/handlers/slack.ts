@@ -4,6 +4,7 @@ import { AIService } from '../services/ai';
 import { NotionService } from '../services/notion';
 import { ConfigService } from '../services/config';
 import { buildConfigBlocks } from '../services/slack-ui';
+import { logger as appLogger } from '../services/logger';
 
 const aiService = new AIService();
 const notionService = new NotionService();
@@ -121,7 +122,7 @@ export const registerSlackHandlers = (app: App) => {
       });
 
     } catch (error: any) {
-      logger.error(error);
+      appLogger.error(error);
       // Use the error message from AIService directly if it exists, as it now contains the Notion URL or a clean failure message.
       await client.chat.postMessage({
         channel: event.item.channel,
@@ -155,7 +156,7 @@ export const registerSlackHandlers = (app: App) => {
             isMember = false;
           } else {
             // Log other errors and continue with isMember = false
-            logger.error('Unexpected error in conversations.info:', error);
+            appLogger.error('Unexpected error in conversations.info:', error);
             isMember = false;
           }
         }

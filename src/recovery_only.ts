@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { NotionService } from './services/notion';
 import { ConfigService } from './services/config';
+import { logger } from './services/logger';
 
 dotenv.config();
 
@@ -24,7 +25,7 @@ app.post('/recovery', async (req, res) => {
     await notionService.processReadyLogs(configService);
     res.status(200).send('Recovery process completed');
   } catch (error) {
-    console.error('Recovery process failed:', error);
+    logger.error('Recovery process failed:', error);
     res.status(500).send('Recovery process failed');
   }
 });

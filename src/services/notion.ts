@@ -3,6 +3,7 @@ import { WebClient } from '@slack/web-api';
 import dotenv from 'dotenv';
 import { ADRData } from './ai';
 import { ConfigService } from './config';
+import { logger } from './logger';
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ export class NotionService {
     this.dataSourceId = process.env.NOTION_DATASOURCE_ID || '';
     
     if (!this.databaseId) {
-        console.error('NOTION_DATABASE_ID is not set!');
+        logger.error('NOTION_DATABASE_ID is not set!');
     }
     if (!this.dataSourceId) {
         console.warn('NOTION_DATASOURCE_ID is not set!');
@@ -154,7 +155,7 @@ export class NotionService {
         
         return (response as any).url;
     } catch(error) {
-        console.error("Failed to create Notion page:", error);
+        logger.error("Failed to create Notion page:", error);
         throw error;
     }
   }
@@ -332,22 +333,28 @@ export class NotionService {
         const channelConfigs = await configService.getAllChannelConfigs();
         console.log(`Checking ${channelConfigs.length} registered channels/databases.`);
 
+        const processedDatabases = new Set<string>();
+
         for (const config of channelConfigs) {
+            const databaseId = config.notionDatabaseId;
+            if (!databaseId) continue;
+            if (processedDatabases.has(databaseId)) continue;
+
             const workspaceConfig = await configService.getWorkspaceConfig(config.workspaceId);
             const token = config.notionAccessToken || workspaceConfig?.notionAccessToken;
 
             if (!token) {
-                console.warn(`Skipping channel ${config.channelId}: No Notion access token found for workspace ${config.workspaceId}`);
+                console.warn(`Skipping channel ${config.channelId} for database ${databaseId}: No Notion access token found.`);
                 continue;
             }
 
+            processedDatabases.add(databaseId);
             const notion = new Client({ auth: token });
-            const databaseId = config.notionDatabaseId;
             let dataSourceId = config.notionDataSourceId;
 
             try {
                 // If dataSourceId is missing, try to fetch it
-                if (!dataSourceId && databaseId) {
+                if (!dataSourceId) {
                     const db = await notion.databases.retrieve({ database_id: databaseId }) as any;
                     if (db.data_sources && db.data_sources.length > 0) {
                         dataSourceId = db.data_sources[0].id;
@@ -370,28 +377,28 @@ export class NotionService {
                 });
 
                 const readyPages = response.results;
-                if (readyPages.length > 0 && databaseId) {
-                    console.log(`Found ${readyPages.length} ready pages in database ${databaseId} (Workspace: ${config.workspaceId})`);
+                if (readyPages.length > 0) {
+                    console.log(`Found ${readyPages.length} ready pages in database ${databaseId}`);
                     for (const page of readyPages) {
                         try {
                             // Pass the token and databaseId explicitly
-                            await this.handleReadyPage(page, token, databaseId, installationStore, config.workspaceId); 
+                            await this.handleReadyPage(page, token, databaseId, configService, installationStore); 
                         } catch (e) {
-                            console.error(`Failed to process page ${page.id}:`, e);
+                            logger.error(`Failed to process page ${page.id}:`, e);
                         }
                     }
                 }
 
             } catch (dbError) {
-                console.error(`Error querying database ${databaseId} for workspace ${config.workspaceId}:`, dbError);
+                logger.error(`Error querying database ${databaseId}:`, dbError);
             }
         }
     } catch (error) {
-        console.error("Error processing ready logs:", error);
+        logger.error("Error processing ready logs:", error);
     }
   }
 
-  private async handleReadyPage(page: any, token: string, databaseId: string, installationStore?: any, workspaceId?: string): Promise<void> {
+  private async handleReadyPage(page: any, token: string, databaseId: string, configService: ConfigService, installationStore?: any): Promise<void> {
       // Need to use the correct token for operations
       const notion = new Client({ auth: token });
     try {
@@ -417,65 +424,72 @@ export class NotionService {
         const newUrl = await this.createADRPage(adrData, slackLink, databaseId, token);
         console.log(`✅ Created ADR Page: ${newUrl}`);
 
-        // 4. Notify Slack if installationStore and workspaceId are provided
-        if (installationStore && workspaceId && slackLink) {
+        // 4. Notify Slack if installationStore and slackLink are available
+        if (installationStore && slackLink) {
             try {
-                // Satisfy the InstallationQuery type explicitly
-                const installation = await installationStore.fetchInstallation({ 
-                    teamId: workspaceId,
-                    enterpriseId: undefined,
-                    userId: undefined,
-                    isEnterpriseInstall: false
-                });
-                const botToken = installation.bot?.token;
-
-                if (botToken) {
-                    const slackClient = new WebClient(botToken);
+                // Extract channel and ts from link (removing queries/fragments)
+                const cleanLink = slackLink.split('?')[0].split('#')[0];
+                console.log(`🔗 Parsing Slack link: ${cleanLink}`);
+                const parts = cleanLink.split('/');
+                if (parts.length >= 2) {
+                    const lastPart = parts[parts.length - 1] === '' ? parts[parts.length - 2] : parts[parts.length - 1];
+                    const channelPart = parts[parts.length - 1] === '' ? parts[parts.length - 3] : parts[parts.length - 2];
                     
-                            // Extract channel and ts from link
-                            console.log(`🔗 Parsing Slack link: ${slackLink}`);
-                            const parts = slackLink.split('/');
-                            if (parts.length >= 2) {
-                                const lastPart = parts[parts.length - 1] === '' ? parts[parts.length - 2] : parts[parts.length - 1];
-                                const channelPart = parts[parts.length - 1] === '' ? parts[parts.length - 3] : parts[parts.length - 2];
+                    if (channelPart && lastPart.startsWith('p')) {
+                        const tsRaw = lastPart.substring(1);
+                        const ts = tsRaw.substring(0, 10) + '.' + tsRaw.substring(10);
+                        const channelId = channelPart;
+
+                        const targetConfig = await configService.getChannelConfig(channelId);
+                        if (!targetConfig || !targetConfig.workspaceId) {
+                            console.warn(`⚠️ No workspace config found for parsed channelId: ${channelId}`);
+                        } else {
+                            const workspaceId = targetConfig.workspaceId;
+                            console.log(`📡 Attempting Slack notification: channel=${channelId}, ts=${ts}, workspace=${workspaceId}`);
+
+                            // Satisfy the InstallationQuery type explicitly
+                            const installation = await installationStore.fetchInstallation({ 
+                                teamId: workspaceId,
+                                enterpriseId: undefined,
+                                userId: undefined,
+                                isEnterpriseInstall: false
+                            });
+                            const botToken = installation.bot?.token;
+                            
+                            if (botToken) {
+                                const slackClient = new WebClient(botToken);
                                 
-                                if (channelPart && lastPart.startsWith('p')) {
-                                    const tsRaw = lastPart.substring(1);
-                                    const ts = tsRaw.substring(0, 10) + '.' + tsRaw.substring(10);
-                                    const channelId = channelPart;
+                                // 診断情報の取得
+                                try {
+                                    const auth = await slackClient.auth.test();
+                                    console.log(`🤖 Bot Identity: user=${auth.user}, userId=${auth.user_id}, team=${auth.team}, teamId=${auth.team_id}`);
 
-                                    console.log(`📡 Attempting Slack notification: channel=${channelId}, ts=${ts}, workspace=${workspaceId}`);
+                                    // チャンネル情報の取得
+                                    const info = await slackClient.conversations.info({ channel: channelId });
+                                    console.log(`📍 Channel Info: name=${info.channel?.name}, is_member=${info.channel?.is_member}, is_private=${info.channel?.is_private}`);
 
-                                    // 診断情報の取得
-                                    try {
-                                        const auth = await slackClient.auth.test();
-                                        console.log(`🤖 Bot Identity: user=${auth.user}, userId=${auth.user_id}, team=${auth.team}, teamId=${auth.team_id}`);
-
-                                        // チャンネル情報の取得
-                                        const info = await slackClient.conversations.info({ channel: channelId });
-                                        console.log(`📍 Channel Info: name=${info.channel?.name}, is_member=${info.channel?.is_member}, is_private=${info.channel?.is_private}`);
-
-                                        if (!info.channel?.is_member && !info.channel?.is_private) {
-                                            console.log(`🤝 Bot is not in public channel ${channelId}. Attempting to join...`);
-                                            await slackClient.conversations.join({ channel: channelId });
-                                        }
-                                    } catch (diagError: any) {
-                                        console.warn(`⚠️ Could not fetch diagnostic info: ${diagError.message}`);
+                                    if (!info.channel?.is_member && !info.channel?.is_private) {
+                                        console.log(`🤝 Bot is not in public channel ${channelId}. Attempting to join...`);
+                                        await slackClient.conversations.join({ channel: channelId });
                                     }
-
-                                    await slackClient.chat.postMessage({
-                                        channel: channelId,
-                                        thread_ts: ts,
-                                        text: `✅ 【Recovery】 I've created a Notion article!\n${newUrl}`
-                                    });
-                                    console.log(`📢 Slack notification sent to ${channelId} (${ts})`);
-                                } else {
-                                    console.warn(`⚠️ Could not parse channel or ts: ${slackLink}`);
+                                } catch (diagError: any) {
+                                    console.warn(`⚠️ Could not fetch diagnostic info: ${diagError.message}`);
                                 }
+
+                                await slackClient.chat.postMessage({
+                                    channel: channelId,
+                                    thread_ts: ts,
+                                    text: `✅ 【Recovery】 I've created a Notion article!\n${newUrl}`
+                                });
+                                console.log(`📢 Slack notification sent to ${channelId} (${ts})`);
                             }
+                        }
+                    } else {
+                        console.warn(`⚠️ Could not parse channel or ts: ${slackLink}`);
+                    }
                 }
             } catch (slackError) {
-                console.error('Failed to send Slack notification:', slackError);
+                logger.error('Failed to send Slack notification:', slackError);
             }
         }
 
@@ -487,7 +501,7 @@ export class NotionService {
         console.log(`🗑️  Archived Ready page: ${readyPageUrl}`);
 
     } catch (error) {
-        console.error(`Failed to handle ready page ${page.id}:`, error);
+        logger.error(`Failed to handle ready page ${page.id}:`, error);
     }
   }
 
@@ -512,7 +526,7 @@ export class NotionService {
         };
       });
     } catch (error) {
-      console.error('Failed to list Notion databases:', error);
+      logger.error('Failed to list Notion databases:', error);
       return [];
     }
   }
@@ -535,7 +549,7 @@ export class NotionService {
       await notion.databases.retrieve({ database_id: databaseId });
       return true;
     } catch (error) {
-      console.error(`Database validation failed for ${databaseId}:`, error);
+      logger.error(`Database validation failed for ${databaseId}:`, error);
       return false;
     }
   }

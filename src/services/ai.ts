@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import { NotionService } from './notion';
+import { logger } from './logger';
 
 dotenv.config();
 
@@ -122,7 +123,7 @@ Do NOT use Markdown formatting (like **, _, [links], etc.) in any of the JSON st
       console.log(`💾 Error prompt saved to Notion: ${url}`);
       return url;
     } catch (err) {
-      console.error('Failed to save error prompt to Notion:', err);
+      logger.error('Failed to save error prompt to Notion:', err);
       return null;
     }
   }

@@ -3,6 +3,7 @@ import { NotionService } from '../services/notion';
 import { ConfigService } from '../services/config';
 import { WebClient } from '@slack/web-api';
 import { buildConfigBlocks } from '../services/slack-ui';
+import { logger } from '../services/logger';
 
 const notionService = new NotionService();
 const configService = new ConfigService();
@@ -101,7 +102,7 @@ export const handleNotionCallback = (installationStore: any) => async (req: Requ
           });
         }
       } catch (slackErr) {
-        console.error('[Notion OAuth] Slack modal update error:', slackErr);
+        logger.error('[Notion OAuth] Slack modal update error:', slackErr);
       }
     }
 
@@ -128,7 +129,7 @@ export const handleNotionCallback = (installationStore: any) => async (req: Requ
     `);
 
   } catch (err) {
-    console.error('[Notion OAuth] Error:', err);
+    logger.error('[Notion OAuth] Error:', err);
     res.status(500).send('Internal Server Error during Notion Authorization');
   }
 };
